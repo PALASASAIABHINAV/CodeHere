@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import dsaRoutes from './routes/dsaRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import profilePictureRoutes from './routes/profilePictureRoutes.js';
 import pool from './config/db.js';
 
 dotenv.config();
@@ -29,6 +30,7 @@ app.use(
 app.use('/api/auth', authRoutes);
 app.use('/api/dsa', dsaRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/profile', profilePictureRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health check route

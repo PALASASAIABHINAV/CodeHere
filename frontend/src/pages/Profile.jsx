@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import ProfilePictureUpload from '../components/ProfilePictureUpload';
 import {
   User,
   Mail,
@@ -15,7 +16,9 @@ import {
   TrendingUp,
   Calendar,
   Edit,
-  Share2
+  Share2,
+  Camera,
+  X
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import ActivityHeatmap from '../components/ActivityHeatmap';
@@ -23,10 +26,11 @@ import ActivityHeatmap from '../components/ActivityHeatmap';
 const Profile = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, profilePictureRequired, updateProfilePicture } = useAuthStore();
   const [profile, setProfile] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const isOwnProfile = !userId || parseInt(userId) === currentUser?.id;
 
@@ -34,6 +38,12 @@ const Profile = () => {
     fetchProfile();
     fetchHeatmap();
   }, [userId, currentUser]);
+
+  useEffect(() => {
+    if (isOwnProfile && profilePictureRequired) {
+      setShowUploadModal(true);
+    }
+  }, [isOwnProfile, profilePictureRequired]);
 
   const fetchProfile = async () => {
     try {
@@ -113,6 +123,12 @@ const Profile = () => {
     alert('Profile link copied to clipboard!');
   };
 
+  const handleProfilePictureUpdate = (newUrl) => {
+    setProfile({ ...profile, profile_picture_url: newUrl });
+    updateProfilePicture(newUrl);
+    setShowUploadModal(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -156,13 +172,31 @@ const Profile = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
-                {profile.name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2)}
+              <div className="relative">
+                {profile.profile_picture_url ? (
+                  <img
+                    src={profile.profile_picture_url}
+                    alt={profile.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-lg"
+                  />
+                ) : (
+                  <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                    {profile.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </div>
+                )}
+                {isOwnProfile && (
+                  <button
+                    onClick={() => setShowUploadModal(!showUploadModal)}
+                    className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 transition shadow-lg"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               <div>
@@ -342,6 +376,28 @@ const Profile = () => {
 
         {/* Heatmap */}
         <ActivityHeatmap heatmapData={heatmap} />
+
+        {/* Profile Picture Upload Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">Upload Profile Picture</h3>
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <ProfilePictureUpload
+                currentPicture={profile.profile_picture_url}
+                onUploadSuccess={handleProfilePictureUpdate}
+                canDelete={!profile.is_prime}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <Footer />

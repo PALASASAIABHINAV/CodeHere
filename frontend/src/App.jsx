@@ -11,30 +11,33 @@ import ProblemSolve from "./pages/ProblemSolve";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/AdminDashboard";
+import ProfilePictureGuard from "./components/ProfilePictureGuard";
 import { useAuthStore } from "./store/authStore";
 
 function App() {
   const { loadUser } = useAuthStore();
-  
+
   React.useEffect(() => {
     loadUser();
   }, [loadUser]);
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/prime" element={<Prime />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/dsa/problems" element={<DsaProblems />} />
-        <Route path="/dsa/problem/:slug" element={<ProblemSolve />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/profile/:userId" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-      </Routes>
+      <ProfilePictureGuard>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/prime" element={<Prime />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/dsa/problems" element={<DsaProblems />} />
+          <Route path="/dsa/problem/:slug" element={<ProblemSolve />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:userId" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+        </Routes>
+      </ProfilePictureGuard>
     </Router>
   );
 }

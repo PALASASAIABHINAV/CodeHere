@@ -66,9 +66,34 @@ const createUserProblemStatusTable = async () => {
   }
 };
 
+// Add profile picture fields to users table
+const addProfilePictureFields = async () => {
+  try {
+    const checkQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='users' AND column_name='profile_picture_url'
+    `;
+    const result = await pool.query(checkQuery);
+
+    if (result.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN profile_picture_url VARCHAR(500),
+        ADD COLUMN profile_picture_public_id VARCHAR(255),
+        ADD COLUMN profile_picture_uploaded_at TIMESTAMP
+      `);
+      console.log('✅ Profile picture fields added to users table');
+    }
+  } catch (err) {
+    console.error('❌ Error adding profile picture fields:', err);
+  }
+};
+
 // Initialize database tables
 createUsersTable();
 createUserProblemStatusTable();
+addProfilePictureFields();
 
 
 

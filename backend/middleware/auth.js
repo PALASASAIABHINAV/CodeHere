@@ -16,29 +16,29 @@ export const verifyToken = (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Add user id to request object
     req.userId = decoded.userId;
-    
+
     // Continue to next middleware/route handler
     next();
   } catch (error) {
     console.error('Token verification error:', error);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Invalid token',
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
         message: 'Token expired. Please login again.',
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Server error during authentication',
@@ -50,15 +50,26 @@ export const verifyToken = (req, res, next) => {
 export const optionalAuth = (req, res, next) => {
   try {
     const token = req.cookies.token;
-    
+
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       req.userId = decoded.userId;
     }
-    
+
     next();
   } catch (error) {
     // Continue without authentication if token is invalid
     next();
   }
+};
+export const requirePrimeProfilePicture = async (req, res, next) => {
+  const user = await User.getById(req.userId);
+  if (user.is_prime && !user.profile_picture_url) {
+    return res.status(403).json({
+      success: false,
+      message: 'Prime users must upload a profile picture',
+      requiresProfilePicture: true
+    });
+  }
+  next();
 };

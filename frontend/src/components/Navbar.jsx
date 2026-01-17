@@ -8,7 +8,7 @@ const Navbar = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
-  
+
   const { user, logout } = useAuthStore();
 
   // Close dropdown when clicking outside
@@ -67,9 +67,17 @@ const Navbar = () => {
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="flex items-center gap-2 hover:opacity-80 transition"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
-                    {getInitials(user.name)}
-                  </div>
+                  {user.profile_picture_url ? (
+                    <img
+                      src={user.profile_picture_url}
+                      alt={user.name}
+                      className="w-10 h-10 rounded-full object-cover border-2 border-blue-500 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-md">
+                      {getInitials(user.name)}
+                    </div>
+                  )}
                   {user.is_prime && (
                     <Crown className="h-4 w-4 text-yellow-500" />
                   )}

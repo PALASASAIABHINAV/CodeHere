@@ -63,6 +63,7 @@ export const signup = async (req, res) => {
         email: user.email,
         role: user.role || 'user',
         is_prime: user.is_prime || false,
+        profile_picture_url: user.profile_picture_url || null,
       },
     });
   } catch (error) {
@@ -127,6 +128,7 @@ export const login = async (req, res) => {
         email: user.email,
         role: user.role || 'user',
         is_prime: user.is_prime || false,
+        profile_picture_url: user.profile_picture_url || null,
       },
     });
   } catch (error) {
@@ -184,6 +186,7 @@ export const getMe = async (req, res) => {
         email: user.email,
         role: user.role || 'user',
         is_prime: user.is_prime || false,
+        profile_picture_url: user.profile_picture_url || null,
         created_at: user.created_at,
       },
     });
