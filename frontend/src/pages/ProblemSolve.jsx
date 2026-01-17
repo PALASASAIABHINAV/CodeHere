@@ -207,7 +207,7 @@ const ProblemSolve = () => {
 
   if (!problem) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-900">
         <div className="text-xl">Loading problem...</div>
       </div>
     );
@@ -215,10 +215,10 @@ const ProblemSolve = () => {
 
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
-      case 'Easy': return 'text-green-400 bg-green-900';
-      case 'Medium': return 'text-yellow-400 bg-yellow-900';
-      case 'Hard': return 'text-red-400 bg-red-900';
-      default: return 'text-gray-400 bg-gray-800';
+      case 'Easy': return 'text-green-600 bg-green-50';
+      case 'Medium': return 'text-yellow-600 bg-yellow-50';
+      case 'Hard': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
 
@@ -233,13 +233,13 @@ const ProblemSolve = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900 text-white">
+    <div className="h-screen flex flex-col bg-gray-50 text-gray-900">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/dsa/problems')}
-            className="flex items-center gap-2 text-gray-300 hover:text-white transition"
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
           >
             <ArrowLeft className="h-5 w-5" />
             Back
@@ -249,7 +249,7 @@ const ProblemSolve = () => {
             {problem.difficulty}
           </span>
           {problem.userStatus === 'solved' && (
-            <CheckCircle className="h-5 w-5 text-green-400" />
+            <CheckCircle className="h-5 w-5 text-green-600" />
           )}
 
           {/* 🔥 Auto-save indicator */}
@@ -283,7 +283,7 @@ const ProblemSolve = () => {
               <button
                 onClick={handleRun}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition disabled:opacity-50"
               >
                 <Play className="h-4 w-4" />
                 {loading ? 'Running...' : 'Run'}
@@ -292,7 +292,7 @@ const ProblemSolve = () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50"
               >
                 <Send className="h-4 w-4" />
                 {loading ? 'Submitting...' : 'Submit'}
@@ -305,15 +305,15 @@ const ProblemSolve = () => {
       {/* Main Content - Split View */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Problem Description */}
-        <div className="w-1/2 flex flex-col bg-gray-900 border-r border-gray-700">
-          <div className="bg-gray-800 border-b border-gray-700 flex">
+        <div className="w-1/2 flex flex-col bg-white border-r border-gray-200">
+          <div className="bg-gray-50 border-b border-gray-200 flex">
             {['description', 'submissions', testResult || submitResult ? 'result' : null].filter(Boolean).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 capitalize ${activeTab === tab
-                  ? 'bg-gray-900 border-b-2 border-blue-500 text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-white border-b-2 border-blue-600 text-gray-900 font-semibold'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 {tab}
@@ -321,11 +321,11 @@ const ProblemSolve = () => {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 bg-gray-900">
+          <div className="flex-1 overflow-y-auto p-6 bg-white">
             {activeTab === 'description' && (
               <div className="space-y-6">
                 <div>
-                  <p className="text-gray-300 whitespace-pre-line leading-relaxed">
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed">
                     {problem.description}
                   </p>
                 </div>
@@ -333,16 +333,16 @@ const ProblemSolve = () => {
                 <div>
                   <h3 className="text-lg font-semibold mb-3 text-blue-400">Examples</h3>
                   {problem.examples && problem.examples.map((example, idx) => (
-                    <div key={idx} className="mb-4 bg-gray-800 p-4 rounded-lg border border-gray-700">
-                      <p className="text-sm text-gray-400 mb-1">
-                        <strong className="text-gray-300">Input:</strong> {example.input}
+                    <div key={idx} className="mb-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-600 mb-1">
+                        <strong className="text-gray-900">Input:</strong> {example.input}
                       </p>
-                      <p className="text-sm text-gray-400 mb-1">
-                        <strong className="text-gray-300">Output:</strong> {example.output}
+                      <p className="text-sm text-gray-600 mb-1">
+                        <strong className="text-gray-900">Output:</strong> {example.output}
                       </p>
                       {example.explanation && (
-                        <p className="text-sm text-gray-400 mt-2">
-                          <strong className="text-gray-300">Explanation:</strong> {example.explanation}
+                        <p className="text-sm text-gray-600 mt-2">
+                          <strong className="text-gray-900">Explanation:</strong> {example.explanation}
                         </p>
                       )}
                     </div>
@@ -351,8 +351,8 @@ const ProblemSolve = () => {
 
                 {problem.constraints && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Constraints</h3>
-                    <pre className="bg-gray-800 p-4 rounded-lg border border-gray-700 whitespace-pre-line text-gray-300">
+                    <h3 className="text-lg font-semibold mb-3 text-gray-900">Constraints</h3>
+                    <pre className="bg-gray-50 p-4 rounded-lg border border-gray-200 whitespace-pre-line text-gray-700">
                       {problem.constraints}
                     </pre>
                   </div>
@@ -360,13 +360,13 @@ const ProblemSolve = () => {
 
                 {problem.acceptance && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Acceptance Rate</h3>
-                    <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h3 className="text-lg font-semibold mb-3 text-gray-900">Acceptance Rate</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-300">{problem.acceptance}%</span>
-                        <span className="text-sm text-gray-400">of submissions accepted</span>
+                        <span className="text-gray-900">{problem.acceptance}%</span>
+                        <span className="text-sm text-gray-600">of submissions accepted</span>
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-green-500 h-2 rounded-full transition-all"
                           style={{ width: `${problem.acceptance}%` }}
@@ -378,14 +378,14 @@ const ProblemSolve = () => {
 
                 {problem.hints && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Hints</h3>
+                    <h3 className="text-lg font-semibold mb-3 text-gray-900">Hints</h3>
                     <div className="space-y-2">
                       {problem.hints.split(",").map((hint, idx) => (
-                        <details key={idx} className="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                          <summary className="cursor-pointer text-gray-300 hover:text-white font-medium">
+                        <details key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <summary className="cursor-pointer text-gray-900 hover:text-blue-600 font-medium">
                             💡 Hint {idx + 1}
                           </summary>
-                          <p className="mt-2 text-gray-400 pl-4">{hint.trim()}</p>
+                          <p className="mt-2 text-gray-600 pl-4">{hint.trim()}</p>
                         </details>
                       ))}
                     </div>
@@ -393,10 +393,10 @@ const ProblemSolve = () => {
                 )}
 
                 <div>
-                  <h3 className="text-lg font-semibold mb-3 text-blue-400">Tags</h3>
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">Tags</h3>
                   <div className="flex flex-wrap gap-2">
                     {problem.tags && problem.tags.map((tag, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
+                      <span key={idx} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm border border-gray-200">
                         {tag}
                       </span>
                     ))}
@@ -405,10 +405,10 @@ const ProblemSolve = () => {
 
                 {problem.companies && problem.companies.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Companies</h3>
+                    <h3 className="text-lg font-semibold mb-3 text-gray-900">Companies</h3>
                     <div className="flex flex-wrap gap-2">
                       {problem.companies.map((company, idx) => (
-                        <span key={idx} className="px-3 py-1 bg-blue-900 text-blue-200 rounded-full text-sm border border-blue-700">
+                        <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm border border-blue-100">
                           {company}
                         </span>
                       ))}
@@ -424,24 +424,24 @@ const ProblemSolve = () => {
                 {problem.submissions && problem.submissions.length > 0 ? (
                   <div className="space-y-3">
                     {problem.submissions.map((sub, idx) => (
-                      <div key={idx} className="bg-gray-800 p-4 rounded-lg border border-gray-700 hover:border-gray-600 transition">
+                      <div key={idx} className="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
                             {sub.status === 'Accepted' ? (
-                              <CheckCircle className="h-5 w-5 text-green-400" />
+                              <CheckCircle className="h-5 w-5 text-green-600" />
                             ) : (
-                              <XCircle className="h-5 w-5 text-red-400" />
+                              <XCircle className="h-5 w-5 text-red-600" />
                             )}
-                            <span className={`font-semibold ${sub.status === 'Accepted' ? 'text-green-400' : 'text-red-400'
+                            <span className={`font-semibold ${sub.status === 'Accepted' ? 'text-green-600' : 'text-red-600'
                               }`}>
                               {sub.status}
                             </span>
                           </div>
-                          <span className="text-sm text-gray-400">
+                          <span className="text-sm text-gray-500">
                             {formatDate(sub.submitted_at)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-400">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
                           <span>Runtime: {sub.runtime}ms</span>
                           <span>Language: {sub.language}</span>
                         </div>
@@ -449,7 +449,7 @@ const ProblemSolve = () => {
                           <summary className="cursor-pointer text-blue-400 hover:text-blue-300 text-sm">
                             View Code
                           </summary>
-                          <pre className="mt-2 p-3 bg-gray-900 rounded text-sm overflow-x-auto border border-gray-700">
+                          <pre className="mt-2 p-3 bg-white rounded text-sm overflow-x-auto border border-gray-200">
                             <code>{sub.code}</code>
                           </pre>
                         </details>
@@ -469,51 +469,51 @@ const ProblemSolve = () => {
               <div className="space-y-4">
                 {testResult && (
                   <div className={`p-4 rounded-lg border-2 ${testResult.passed
-                    ? 'bg-green-900/20 border-green-700'
-                    : 'bg-red-900/20 border-red-700'
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
                     }`}>
                     <div className="flex items-center gap-3 mb-4">
                       {testResult.passed ? (
-                        <CheckCircle className="h-6 w-6 text-green-400" />
+                        <CheckCircle className="h-6 w-6 text-green-600" />
                       ) : (
-                        <XCircle className="h-6 w-6 text-red-400" />
+                        <XCircle className="h-6 w-6 text-red-600" />
                       )}
-                      <span className="text-lg font-semibold">{testResult.status}</span>
+                      <span className="text-lg font-semibold text-gray-900">{testResult.status}</span>
                     </div>
 
                     {testResult.error ? (
-                      <div className="bg-gray-800 p-3 rounded">
-                        <p className="text-red-300 font-mono text-sm">{testResult.error}</p>
+                      <div className="bg-white p-3 rounded border border-red-200">
+                        <p className="text-red-600 font-mono text-sm">{testResult.error}</p>
                       </div>
                     ) : testResult.testCase ? (
                       <>
                         <div className="space-y-3">
                           <div>
-                            <p className="text-sm text-gray-400 mb-1">Input:</p>
-                            <pre className="bg-gray-800 p-3 rounded text-sm overflow-x-auto">
+                            <p className="text-sm text-gray-600 mb-1">Input:</p>
+                            <pre className="bg-white p-3 rounded text-sm overflow-x-auto border border-gray-200">
                               {testResult.testCase.input}
                             </pre>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-400 mb-1">Expected Output:</p>
-                            <pre className="bg-gray-800 p-3 rounded text-sm">
+                            <p className="text-sm text-gray-600 mb-1">Expected Output:</p>
+                            <pre className="bg-white p-3 rounded text-sm border border-gray-200">
                               {testResult.testCase.expectedOutput}
                             </pre>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-400 mb-1">Your Output:</p>
-                            <pre className={`p-3 rounded text-sm ${testResult.passed ? 'bg-green-900/30' : 'bg-red-900/30'
+                            <p className="text-sm text-gray-600 mb-1">Your Output:</p>
+                            <pre className={`p-3 rounded text-sm border ${testResult.passed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                               }`}>
                               {testResult.testCase.actualOutput}
                             </pre>
                           </div>
                           {testResult.testCase.explanation && (
                             <div>
-                              <p className="text-sm text-gray-400 mb-1">Explanation:</p>
-                              <p className="text-sm text-gray-300">{testResult.testCase.explanation}</p>
+                              <p className="text-sm text-gray-600 mb-1">Explanation:</p>
+                              <p className="text-sm text-gray-700">{testResult.testCase.explanation}</p>
                             </div>
                           )}
-                          <p className="text-sm text-gray-400">Runtime: {testResult.runtime}ms</p>
+                          <p className="text-sm text-gray-600">Runtime: {testResult.runtime}ms</p>
                         </div>
                       </>
                     ) : null}
@@ -522,37 +522,37 @@ const ProblemSolve = () => {
 
                 {submitResult && (
                   <div className={`p-4 rounded-lg border-2 ${submitResult.allPassed
-                    ? 'bg-green-900/20 border-green-700'
-                    : 'bg-red-900/20 border-red-700'
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
                     }`}>
                     <div className="flex items-center gap-3 mb-4">
                       {submitResult.allPassed ? (
-                        <CheckCircle className="h-6 w-6 text-green-400" />
+                        <CheckCircle className="h-6 w-6 text-green-600" />
                       ) : (
-                        <XCircle className="h-6 w-6 text-red-400" />
+                        <XCircle className="h-6 w-6 text-red-600" />
                       )}
-                      <span className="text-lg font-semibold">{submitResult.status}</span>
+                      <span className="text-lg font-semibold text-gray-900">{submitResult.status}</span>
                     </div>
 
                     <div className="space-y-2 mb-4">
-                      <p className="text-gray-300">
+                      <p className="text-gray-700">
                         Test Cases Passed: <span className="font-semibold">{submitResult.testsPassed} / {submitResult.totalTests}</span>
                       </p>
                       {submitResult.runtime && (
-                        <p className="text-gray-300">
+                        <p className="text-gray-700">
                           Average Runtime: <span className="font-semibold">{submitResult.runtime}ms</span>
                         </p>
                       )}
                       {submitResult.failedTestCase && (
-                        <p className="text-red-400">
+                        <p className="text-red-600">
                           Failed on test case #{submitResult.failedTestCase}
                         </p>
                       )}
                     </div>
 
                     {submitResult.allPassed && (
-                      <div className="mt-4 p-3 bg-green-800/50 rounded-lg border border-green-600">
-                        <p className="font-semibold text-green-200">
+                      <div className="mt-4 p-3 bg-green-100 rounded-lg border border-green-300">
+                        <p className="font-semibold text-green-700">
                           🎉 Congratulations! Your solution passed all test cases!
                         </p>
                       </div>
@@ -565,7 +565,7 @@ const ProblemSolve = () => {
         </div>
 
         {/* Right Panel - Code Editor */}
-        <div className="w-1/2 flex flex-col bg-gray-900 relative">
+        <div className="w-1/2 flex flex-col bg-white relative">
           {!user && (
             <div className="absolute inset-0 bg-gray-900/98 z-50 flex items-center justify-center backdrop-blur-md">
               <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700 shadow-2xl">
@@ -651,12 +651,12 @@ const ProblemSolve = () => {
             </div>
           )}
 
-          <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center">
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex justify-between items-center">
             <select
               disabled={!user}
               value={language}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-1.5 bg-gray-700 text-gray-200 rounded disabled:opacity-50 font-medium"
+              className="px-3 py-1.5 bg-white border border-gray-300 text-gray-900 rounded disabled:opacity-50 font-medium"
             >
               <option value="javascript">
                 JavaScript (Node.js)
@@ -670,7 +670,7 @@ const ProblemSolve = () => {
               <button
                 onClick={() => setShowTestCaseDetails(!showTestCaseDetails)}
                 disabled={!user}
-                className={`px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-2 transition ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`px-3 py-1 text-sm bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded flex items-center gap-2 transition ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Eye className="h-4 w-4" />
                 {showTestCaseDetails ? 'Hide' : 'Show'} Test Cases
@@ -684,7 +684,7 @@ const ProblemSolve = () => {
                     onClick={() => setSelectedTestCase(idx)}
                     className={`px-3 py-1 text-sm rounded transition ${selectedTestCase === idx
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                       }`}
                   >
                     Case {idx + 1}
@@ -694,22 +694,22 @@ const ProblemSolve = () => {
           </div>
 
           {showTestCaseDetails && user && problem.test_cases && problem.test_cases[selectedTestCase] && (
-            <div className="bg-gray-800 border-b border-gray-700 p-4">
+            <div className="bg-gray-50 border-b border-gray-200 p-4">
               <div className="text-sm">
-                <p className="text-gray-400 mb-2">
+                <p className="text-gray-600 mb-2">
                   <strong>Test Case {selectedTestCase + 1}:</strong>
                 </p>
-                <div className="bg-gray-900 p-3 rounded">
-                  <p className="text-gray-300 mb-2">
+                <div className="bg-white border border-gray-200 p-3 rounded">
+                  <p className="text-gray-900 mb-2">
                     <strong>Input:</strong>
                   </p>
-                  <pre className="text-gray-400 text-xs overflow-x-auto">
+                  <pre className="text-gray-700 text-xs overflow-x-auto">
                     {problem.test_cases[selectedTestCase].input}
                   </pre>
-                  <p className="text-gray-300 mt-3 mb-2">
+                  <p className="text-gray-900 mt-3 mb-2">
                     <strong>Expected Output:</strong>
                   </p>
-                  <pre className="text-gray-400 text-xs">
+                  <pre className="text-gray-700 text-xs">
                     {problem.test_cases[selectedTestCase].output}
                   </pre>
                 </div>

@@ -12,6 +12,9 @@
   "dependencies": {
     "@better-auth/client": "^0.0.2-alpha.3",
     "@monaco-editor/react": "^4.7.0",
+    "@tensorflow-models/face-detection": "^1.0.3",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.26.2",
     "lodash": "^4.17.21",
