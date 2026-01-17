@@ -171,6 +171,51 @@ class DsaProblem {
       throw error;
     }
   }
+
+  // 🔥 NEW: Auto-save code (cloud saving like LeetCode)
+  static async saveAutoSaveCode(userId, problemId, code, language) {
+    try {
+      const query = `
+        INSERT INTO code_autosave (user_id, problem_id, code, language, saved_at)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, problem_id, language)
+        DO UPDATE SET 
+          code = $3,
+          saved_at = CURRENT_TIMESTAMP
+        RETURNING *
+      `;
+      const result = await pool.query(query, [userId, problemId, code, language]);
+      return result.rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // 🔥 NEW: Get auto-saved code
+  static async getAutoSavedCode(userId, problemId) {
+    try {
+      const query = `
+        SELECT code, language, saved_at
+        FROM code_autosave
+        WHERE user_id = $1 AND problem_id = $2
+        ORDER BY saved_at DESC
+      `;
+      const result = await pool.query(query, [userId, problemId]);
+
+      // Return object with code for each language
+      const autoSaved = {};
+      result.rows.forEach(row => {
+        autoSaved[row.language] = {
+          code: row.code,
+          savedAt: row.saved_at
+        };
+      });
+
+      return autoSaved;
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 export default DsaProblem;

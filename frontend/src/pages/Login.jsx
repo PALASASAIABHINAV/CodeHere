@@ -1,22 +1,27 @@
 import React, { useState } from "react";
 import { Code, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
 const Login = () => {
+  const location = useLocation();
   const navigate = useNavigate();
+
+  // Get ?redirect=...
+  const params = new URLSearchParams(location.search);
+  const redirectTo = params.get("redirect") || "/home";
+
+  const { login } = useAuthStore();
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const { login } = useAuthStore();
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  // Handle login
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -24,7 +29,7 @@ const Login = () => {
 
     try {
       await login(formData.email, formData.password);
-      navigate("/home");
+      navigate(redirectTo); // 🔥 redirect to original page
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -46,7 +51,7 @@ const Login = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Error message */}
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex">
               <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
@@ -55,7 +60,7 @@ const Login = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
+
             <div>
               <label className="text-sm font-medium block mb-2">Email Address</label>
               <div className="relative">
@@ -73,11 +78,11 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="text-sm font-medium block mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+
                 <input
                   type={showPassword ? "text" : "password"}
                   required
@@ -94,7 +99,11 @@ const Login = () => {
                   className="absolute right-3 top-3"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
                 </button>
               </div>
             </div>
@@ -102,15 +111,18 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?
-            <Link to="/signup" className="text-blue-600 ml-1 hover:underline font-semibold">
+            Don’t have an account?
+            <Link
+              to={`/signup?redirect=${redirectTo}`}
+              className="text-blue-600 ml-1 hover:underline font-semibold"
+            >
               Sign Up
             </Link>
           </p>

@@ -4,12 +4,12 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import dsaRoutes from './routes/dsaRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import pool from './config/db.js';
 
-// Load environment variables
 dotenv.config();
 
-// Initialize express app
 const app = express();
 
 // Middleware
@@ -28,6 +28,8 @@ app.use(
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/dsa', dsaRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -78,7 +80,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 Frontend URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
 });
 

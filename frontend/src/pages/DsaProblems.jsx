@@ -2,20 +2,45 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { Search, Filter, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, Filter, CheckCircle, Clock } from 'lucide-react';
 
 const DsaProblems = () => {
   const navigate = useNavigate();
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [userLoaded, setUserLoaded] = useState(false); // ⭐ Track user fetch completion
   const [filters, setFilters] = useState({
     difficulty: '',
     search: '',
   });
 
+  // ⭐ Fetch User Info (check if prime user)
   useEffect(() => {
-    fetchProblems();
-  }, [filters]);
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/profile/me", {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (data.success) setUser(data.user);
+        else setUser(null);
+      } catch (err) {
+        setUser(null);
+      } finally {
+        setUserLoaded(true); // ⭐ Mark user fetch as complete
+      }
+    };
+
+    fetchUser();
+  }, []);
+
+  // Fetch problems whenever filters change + user loaded
+  useEffect(() => {
+    if (userLoaded) { // ⭐ Fetch once user state resolves (logged in or not)
+      fetchProblems();
+    }
+  }, [filters, userLoaded]);
 
   const fetchProblems = async () => {
     try {
@@ -27,10 +52,18 @@ const DsaProblems = () => {
         `http://localhost:5000/api/dsa/problems?${params}`,
         { credentials: 'include' }
       );
+
       const data = await response.json();
-      
+
       if (data.success) {
-        setProblems(data.problems);
+        let list = data.problems;
+
+        // ⭐ FILTER FREE USERS – ONLY FREE PROBLEMS
+        if (!user?.is_prime) {
+          list = list.filter(p => !p.is_premium);
+        }
+
+        setProblems(list);
       }
     } catch (error) {
       console.error('Error fetching problems:', error);
@@ -66,7 +99,7 @@ const DsaProblems = () => {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
+
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">DSA Problems</h1>
           <p className="text-gray-600">
@@ -77,13 +110,13 @@ const DsaProblems = () => {
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
+
             <div className="relative">
               <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search problems..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 value={filters.search}
                 onChange={(e) =>
                   setFilters({ ...filters, search: e.target.value })
@@ -91,11 +124,10 @@ const DsaProblems = () => {
               />
             </div>
 
-            {/* Difficulty Filter */}
             <div className="relative">
               <Filter className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <select
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none"
                 value={filters.difficulty}
                 onChange={(e) =>
                   setFilters({ ...filters, difficulty: e.target.value })
@@ -107,6 +139,7 @@ const DsaProblems = () => {
                 <option value="Hard">Hard</option>
               </select>
             </div>
+
           </div>
         </div>
 
@@ -121,7 +154,7 @@ const DsaProblems = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -140,6 +173,7 @@ const DsaProblems = () => {
                     </th>
                   </tr>
                 </thead>
+
                 <tbody className="bg-white divide-y divide-gray-200">
                   {problems.map((problem) => (
                     <tr
@@ -147,20 +181,23 @@ const DsaProblems = () => {
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
                       onClick={() => navigate(`/dsa/problem/${problem.slug}`)}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         {getStatusIcon(problem.userStatus)}
                       </td>
+
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">
                             {problem.title}
                           </div>
+
                           {problem.is_premium && (
                             <span className="ml-2 px-2 py-1 text-xs font-semibold text-yellow-600 bg-yellow-100 rounded">
                               Premium
                             </span>
                           )}
                         </div>
+
                         <div className="mt-1 flex flex-wrap gap-1">
                           {problem.tags.slice(0, 3).map((tag, idx) => (
                             <span
@@ -172,7 +209,8 @@ const DsaProblems = () => {
                           ))}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+
+                      <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 text-sm font-medium rounded-full ${getDifficultyColor(
                             problem.difficulty
@@ -181,9 +219,11 @@ const DsaProblems = () => {
                           {problem.difficulty}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+
+                      <td className="px-6 py-4 text-sm text-gray-500">
                         {problem.acceptance_rate}%
                       </td>
+
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">
                           {problem.companies.slice(0, 3).map((company, idx) => (
@@ -196,6 +236,7 @@ const DsaProblems = () => {
                           ))}
                         </div>
                       </td>
+
                     </tr>
                   ))}
                 </tbody>
@@ -203,6 +244,7 @@ const DsaProblems = () => {
             </div>
           )}
         </div>
+
       </div>
 
       <Footer />

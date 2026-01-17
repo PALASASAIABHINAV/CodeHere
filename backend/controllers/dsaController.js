@@ -1,5 +1,16 @@
 import DsaProblem from '../models/DsaProblem.js';
 import { VM } from 'vm2';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import axios from 'axios';
+
+
+const execPromise = promisify(exec);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // @desc    Get all DSA problems
 // @route   GET /api/dsa/problems
@@ -15,28 +26,17 @@ export const getAllProblems = async (req, res) => {
 
     let problems = await DsaProblem.getAll(filters);
 
-    // ⬇️ FIX 1: Convert JSONB strings into real arrays
     problems = problems.map((p) => {
       return {
         ...p,
-        test_cases:
-          typeof p.test_cases === "string"
-            ? JSON.parse(p.test_cases)
-            : p.test_cases || [],
-        examples:
-          typeof p.examples === "string"
-            ? JSON.parse(p.examples)
-            : p.examples || [],
+        test_cases: typeof p.test_cases === "string" ? JSON.parse(p.test_cases) : p.test_cases || [],
+        examples: typeof p.examples === "string" ? JSON.parse(p.examples) : p.examples || [],
       };
     });
 
-    // ⬇️ FIX 2: Attach user status if logged in
     if (req.userId) {
       for (let problem of problems) {
-        const status = await DsaProblem.getUserProblemStatus(
-          req.userId,
-          problem.id
-        );
+        const status = await DsaProblem.getUserProblemStatus(req.userId, problem.id);
         problem.userStatus = status;
       }
     }
@@ -55,7 +55,6 @@ export const getAllProblems = async (req, res) => {
   }
 };
 
-
 // @desc    Get single problem by slug
 // @route   GET /api/dsa/problems/:slug
 // @access  Public
@@ -70,7 +69,6 @@ export const getProblemBySlug = async (req, res) => {
       });
     }
 
-    // ⬇️ FIX: Convert JSONB to actual arrays
     if (typeof problem.test_cases === "string") {
       problem.test_cases = JSON.parse(problem.test_cases);
     }
@@ -81,10 +79,14 @@ export const getProblemBySlug = async (req, res) => {
       problem.test_cases = [];
     }
 
-    // User info
     if (req.userId) {
       problem.userStatus = await DsaProblem.getUserProblemStatus(req.userId, problem.id);
       problem.lastAcceptedCode = (await DsaProblem.getLastAcceptedSubmission(req.userId, problem.id))?.code || null;
+
+      // 🔥 NEW: Get auto-saved code
+      const autoSaved = await DsaProblem.getAutoSavedCode(req.userId, problem.id);
+      problem.autoSavedCode = autoSaved;
+
       problem.submissions = await DsaProblem.getUserSubmissions(req.userId, problem.id);
     }
 
@@ -101,43 +103,240 @@ export const getProblemBySlug = async (req, res) => {
   }
 };
 
+// 🔥 Helper: Wrap JavaScript code with multi-input support
+const wrapJavaScriptCode = (code, testCase) => {
+  const functionMatch = code.match(/(?:var|let|const|function)\s+(\w+)\s*=/);
+  const functionName = functionMatch ? functionMatch[1] : 'solution';
 
-// Helper function to wrap user code based on language
-const wrapUserCode = (code, language, testCase, problemSlug) => {
-  if (language === 'javascript') {
-    // Extract function name from code (e.g., "twoSum", "isPalindrome")
-    const functionMatch = code.match(/(?:var|let|const|function)\s+(\w+)\s*=/);
-    const functionName = functionMatch ? functionMatch[1] : 'solution';
+  const inputs = testCase.input
+    .trim()
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line !== '');
 
-    // Parse test case input - split by newline for multiple inputs
-    const inputs = testCase.input.trim().split('\n');
+  return `
+    ${code}
     
-    // Build the wrapper
-    return `
-      ${code}
-      
-      // Parse inputs
-      const inputs = ${JSON.stringify(inputs)};
-      const parsedInputs = inputs.map(input => {
-        try {
-          return JSON.parse(input);
-        } catch {
-          return isNaN(input) ? input : Number(input);
+    const inputs = ${JSON.stringify(inputs)};
+    const parsedInputs = inputs.map(input => {
+      try {
+        return JSON.parse(input);
+      } catch {
+        if (!isNaN(input) && input !== '') {
+          return Number(input);
         }
-      });
-      
-      // Call the function with parsed inputs
-      const result = ${functionName}(...parsedInputs);
-      
-      // Return as JSON string for comparison
-      JSON.stringify(result);
-    `;
-  } else if (language === 'cpp') {
-    // C++ execution not implemented yet
-    throw new Error('C++ execution not supported yet');
+        return input;
+      }
+    });
+    
+    const result = ${functionName}(...parsedInputs);
+    JSON.stringify(result);
+  `;
+};
+
+// 🔥 Helper: Wrap C++ code with multi-input support
+const wrapCppCode = (userCode, testCase) => {
+  const inputs = testCase.input
+    .trim()
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line !== '');
+
+  // Parse expected output to determine return type
+  let outputType = 'string';
+  try {
+    const parsed = JSON.parse(testCase.output);
+    if (Array.isArray(parsed)) {
+      outputType = 'vector';
+    } else if (typeof parsed === 'number') {
+      outputType = 'int';
+    } else if (typeof parsed === 'boolean') {
+      outputType = 'bool';
+    }
+  } catch (e) {
+    outputType = 'string';
   }
-  
-  throw new Error('Unsupported language');
+
+  // Helper functions for parsing and serializing
+  const helperCode = `
+#include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <algorithm>
+#include <climits>
+#include <cmath>
+#include <unordered_map>
+#include <unordered_set>
+#include <map>
+#include <set>
+#include <queue>
+#include <stack>
+using namespace std;
+
+// JSON serialization helpers
+string vectorToJson(const vector<int>& vec) {
+    string result = "[";
+    for (size_t i = 0; i < vec.size(); i++) {
+        result += to_string(vec[i]);
+        if (i < vec.size() - 1) result += ",";
+    }
+    result += "]";
+    return result;
+}
+
+string vectorToJson(const vector<string>& vec) {
+    string result = "[";
+    for (size_t i = 0; i < vec.size(); i++) {
+        result += "\\"" + vec[i] + "\\"";
+        if (i < vec.size() - 1) result += ",";
+    }
+    result += "]";
+    return result;
+}
+
+// Parse JSON array to vector<int>
+vector<int> parseIntArray(const string& input) {
+    vector<int> result;
+    string cleaned = input;
+    cleaned.erase(remove(cleaned.begin(), cleaned.end(), '['), cleaned.end());
+    cleaned.erase(remove(cleaned.begin(), cleaned.end(), ']'), cleaned.end());
+    cleaned.erase(remove(cleaned.begin(), cleaned.end(), ' '), cleaned.end());
+    
+    stringstream ss(cleaned);
+    string item;
+    while (getline(ss, item, ',')) {
+        if (!item.empty()) {
+            result.push_back(stoi(item));
+        }
+    }
+    return result;
+}
+
+// Parse single integer
+int parseInt(const string& input) {
+    string cleaned = input;
+    cleaned.erase(remove(cleaned.begin(), cleaned.end(), ' '), cleaned.end());
+    return stoi(cleaned);
+}
+
+// Parse string
+string parseString(const string& input) {
+    string cleaned = input;
+    // Remove quotes if present
+    if (!cleaned.empty() && cleaned.front() == '"' && cleaned.back() == '"') {
+        cleaned = cleaned.substr(1, cleaned.length() - 2);
+    }
+    return cleaned;
+}
+
+${userCode}
+
+int main() {
+    Solution solution;
+    
+    // Parse inputs
+    ${inputs.map((input, idx) => {
+    const trimmed = input.trim();
+    // Detect input type: array, string, or number
+    if (trimmed.startsWith('[')) {
+      return `vector<int> input${idx} = parseIntArray(R"(${input})");`;
+    } else if (trimmed.startsWith('"') || isNaN(trimmed)) {
+      // String input (quoted or non-numeric)
+      return `string input${idx} = parseString(R"(${input})");`;
+    } else {
+      // Numeric input
+      return `int input${idx} = parseInt(R"(${input})");`;
+    }
+  }).join('\n    ')}
+    
+    // Call solution
+    auto result = solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+    
+    // Output result as JSON
+    ${outputType === 'vector' ? 'cout << vectorToJson(result) << endl;' :
+      outputType === 'int' ? 'cout << result << endl;' :
+        outputType === 'bool' ? 'cout << (result ? "true" : "false") << endl;' :
+          'cout << "\\"" << result << "\\"" << endl;'}
+    
+    return 0;
+}
+  `;
+
+  return helperCode;
+};
+
+// Extract C++ function name from user code
+const extractCppFunctionName = (code) => {
+  // Match: returnType functionName(params)
+  const match = code.match(/\s+(\w+)\s*\([^)]*\)\s*{/);
+  return match ? match[1] : 'solve';
+};
+
+// 🔥 NEW: Smart C++ code wrapper (LeetCode-style)
+// Auto-detects if user provided just a function and wraps it with Solution class
+const smartCppWrapper = (userCode) => {
+  // Check if code already has class Solution
+  const hasClass = userCode.includes('class Solution');
+
+  // If user provided complete Solution class, return as-is
+  if (hasClass) {
+    return userCode;
+  }
+
+  // Otherwise, wrap the function in Solution class (WITHOUT includes - wrapCppCode adds those)
+  const wrappedCode = `class Solution {
+public:
+    ${userCode.trim()}
+};`;
+
+  return wrappedCode;
+};
+
+// 🔥 Execute C++ code using Piston API (Free, No Setup, Just Works!)
+const executeCppCode = async (code, testCase) => {
+  try {
+    // Step 1: Wrap user's function-only code in Solution class (LeetCode-style)
+    const solutionClass = smartCppWrapper(code);
+
+    // Step 2: Wrap with complete program including main(), includes, and test harness
+    const completeProgram = wrapCppCode(solutionClass, testCase);
+
+    // Use Piston API - completely free, no signup, no Docker needed!
+    // Public instance: https://emkc.org/api/v2/piston
+    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+      language: 'c++',
+      version: '10.2.0',
+      files: [{
+        name: 'solution.cpp',
+        content: completeProgram
+      }]
+    }, {
+      timeout: 10000 // 10 seconds
+    });
+
+    const output = response.data.run.output || '';
+    const stderr = response.data.run.stderr || '';
+
+    // Check for compilation errors
+    if (stderr && stderr.includes('error:')) {
+      throw new Error(stderr);
+    }
+
+    return output.trim();
+  } catch (error) {
+    // Check for timeout
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new Error('timeout exceeded');
+    }
+
+    // Check for network errors
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      throw new Error('Unable to connect to code execution service. Please check your internet connection.');
+    }
+
+    throw error;
+  }
 };
 
 // @desc    Run code (test without submitting)
@@ -154,7 +353,6 @@ export const runCode = async (req, res) => {
       });
     }
 
-    // Get problem
     const problem = await DsaProblem.getById(problemId);
     if (!problem) {
       return res.status(404).json({
@@ -163,36 +361,56 @@ export const runCode = async (req, res) => {
       });
     }
 
-    if (language !== 'javascript') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only JavaScript is supported currently',
-      });
-    }
-
-    // Get test case to run
-    const testCase = testCaseIndex !== undefined 
+    const testCase = testCaseIndex !== undefined
       ? problem.test_cases[testCaseIndex]
       : problem.test_cases[0];
 
+    if (!testCase) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test case not found',
+      });
+    }
+
     try {
       const startTime = Date.now();
-      
-      // Execute code in sandbox
-      const vm = new VM({
-        timeout: 3000,
-        sandbox: {}
-      });
+      let result;
 
-      // Wrap user code
-      const wrappedCode = wrapUserCode(code, language, testCase, problem.slug);
-      const result = vm.run(wrappedCode);
+      if (language === 'javascript') {
+        const vm = new VM({
+          timeout: 3000,
+          sandbox: {}
+        });
+
+        const wrappedCode = wrapJavaScriptCode(code, testCase);
+        result = vm.run(wrappedCode);
+      }
+      else if (language === 'cpp') {
+        // Piston API handles raw C++ code directly - no wrapping needed
+        result = await executeCppCode(code, testCase);
+      }
+      else {
+        return res.status(400).json({
+          success: false,
+          message: 'Unsupported language',
+        });
+      }
+
       const runtime = Date.now() - startTime;
 
       // Compare output
       const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
       const actualOutput = result.trim();
-      const passed = actualOutput === expectedOutput;
+
+      // Normalize for comparison
+      let normalizedActual = actualOutput;
+      try {
+        normalizedActual = JSON.stringify(JSON.parse(actualOutput));
+      } catch (e) {
+        // If not JSON, compare as string
+      }
+
+      const passed = normalizedActual === expectedOutput;
 
       res.status(200).json({
         success: true,
@@ -207,11 +425,16 @@ export const runCode = async (req, res) => {
         status: passed ? 'Accepted' : 'Wrong Answer',
       });
     } catch (error) {
+      const isTimeout = error.message.includes('timeout') || error.killed;
+      const isCompileError = error.message.includes('error:');
+
       res.status(200).json({
         success: true,
         passed: false,
         error: error.message,
-        status: error.message.includes('timeout') ? 'Time Limit Exceeded' : 'Runtime Error',
+        status: isTimeout ? 'Time Limit Exceeded' :
+          isCompileError ? 'Compilation Error' :
+            'Runtime Error',
       });
     }
   } catch (error) {
@@ -237,19 +460,11 @@ export const submitCode = async (req, res) => {
       });
     }
 
-    // Get problem with all test cases
     const problem = await DsaProblem.getById(problemId);
     if (!problem) {
       return res.status(404).json({
         success: false,
         message: 'Problem not found',
-      });
-    }
-
-    if (language !== 'javascript') {
-      return res.status(400).json({
-        success: false,
-        message: 'Only JavaScript is supported currently',
       });
     }
 
@@ -264,20 +479,31 @@ export const submitCode = async (req, res) => {
 
       try {
         const startTime = Date.now();
-        
-        const vm = new VM({
-          timeout: 3000,
-          sandbox: {}
-        });
+        let result;
 
-        const wrappedCode = wrapUserCode(code, language, testCase, problem.slug);
-        const result = vm.run(wrappedCode);
+        if (language === 'javascript') {
+          const vm = new VM({
+            timeout: 3000,
+            sandbox: {}
+          });
+          const wrappedCode = wrapJavaScriptCode(code, testCase);
+          result = vm.run(wrappedCode);
+        }
+        else if (language === 'cpp') {
+          // Piston API handles raw C++ code directly - no wrapping needed
+          result = await executeCppCode(code, testCase);
+        }
+
         const runtime = Date.now() - startTime;
         totalRuntime += runtime;
 
         const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
-        const actualOutput = result.trim();
-        const passed = actualOutput === expectedOutput;
+        let normalizedActual = result.trim();
+        try {
+          normalizedActual = JSON.stringify(JSON.parse(result.trim()));
+        } catch (e) { }
+
+        const passed = normalizedActual === expectedOutput;
 
         results.push({
           testCase: i + 1,
@@ -296,11 +522,16 @@ export const submitCode = async (req, res) => {
       } catch (error) {
         allPassed = false;
         failedTestCase = i + 1;
+        const isTimeout = error.message.includes('timeout') || error.killed;
+        const isCompileError = error.message.includes('error:');
+
         results.push({
           testCase: i + 1,
           passed: false,
           error: error.message,
-          status: error.message.includes('timeout') ? 'Time Limit Exceeded' : 'Runtime Error',
+          status: isTimeout ? 'Time Limit Exceeded' :
+            isCompileError ? 'Compilation Error' :
+              'Runtime Error',
         });
         break;
       }
@@ -309,7 +540,6 @@ export const submitCode = async (req, res) => {
     const status = allPassed ? 'Accepted' : 'Wrong Answer';
     const avgRuntime = results.length > 0 ? Math.round(totalRuntime / results.length) : 0;
 
-    // Save submission to database
     const submission = await DsaProblem.submitSolution(
       req.userId,
       problemId,
@@ -333,6 +563,36 @@ export const submitCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Submit code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+// 🔥 NEW: Auto-save code (like LeetCode)
+// @desc    Auto-save code while typing
+// @route   POST /api/dsa/autosave
+// @access  Private
+export const autoSaveCode = async (req, res) => {
+  try {
+    const { code, language, problemId } = req.body;
+
+    if (!code || !language || !problemId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Code, language, and problemId are required',
+      });
+    }
+
+    await DsaProblem.saveAutoSaveCode(req.userId, problemId, code, language);
+
+    res.status(200).json({
+      success: true,
+      message: 'Code auto-saved',
+    });
+  } catch (error) {
+    console.error('Auto-save error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error',

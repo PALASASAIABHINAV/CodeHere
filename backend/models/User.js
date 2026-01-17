@@ -5,18 +5,23 @@ class User {
   // Create a new user
   static async create(name, email, password) {
     try {
-      // Hash password before storing
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
       const query = `
         INSERT INTO users (name, email, password)
         VALUES ($1, $2, $3)
-        RETURNING id, name, email, created_at
+        RETURNING id, name, email, role, is_prime, created_at
       `;
       
       const values = [name, email, hashedPassword];
       const result = await pool.query(query, values);
+      
+      // Create user profile
+      await pool.query(
+        'INSERT INTO user_profiles (user_id) VALUES ($1)',
+        [result.rows[0].id]
+      );
       
       return result.rows[0];
     } catch (error) {
@@ -39,7 +44,7 @@ class User {
   // Find user by ID
   static async findById(id) {
     try {
-      const query = 'SELECT id, name, email, created_at FROM users WHERE id = $1';
+      const query = 'SELECT id, name, email, role, is_prime, avatar_url, created_at FROM users WHERE id = $1';
       const result = await pool.query(query, [id]);
       
       return result.rows[0];
@@ -53,10 +58,23 @@ class User {
     return await bcrypt.compare(plainPassword, hashedPassword);
   }
 
-  // Get all users (for admin, optional)
+  // Get all users (for admin)
   static async getAll() {
     try {
-      const query = 'SELECT id, name, email, created_at FROM users ORDER BY created_at DESC';
+      const query = `
+        SELECT 
+          u.id, 
+          u.name, 
+          u.email, 
+          u.role, 
+          u.is_prime, 
+          u.created_at,
+          COUNT(DISTINCT ups.problem_id) FILTER (WHERE ups.status = 'solved') as solved_count
+        FROM users u
+        LEFT JOIN user_problem_status ups ON u.id = ups.user_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+      `;
       const result = await pool.query(query);
       
       return result.rows;
@@ -72,13 +90,29 @@ class User {
         UPDATE users 
         SET name = $1, email = $2, updated_at = CURRENT_TIMESTAMP
         WHERE id = $3
-        RETURNING id, name, email, updated_at
+        RETURNING id, name, email, role, is_prime, updated_at
       `;
       
       const values = [name, email, id];
       const result = await pool.query(query, values);
       
       return result.rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Update password
+  static async updatePassword(id, hashedPassword) {
+    try {
+      const query = `
+        UPDATE users 
+        SET password = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `;
+      
+      await pool.query(query, [hashedPassword, id]);
+      return true;
     } catch (error) {
       throw error;
     }

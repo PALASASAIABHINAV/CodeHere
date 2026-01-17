@@ -1,14 +1,20 @@
 import React, { useState } from "react";
 import { Code, Mail, Lock, User, Eye, EyeOff, AlertCircle } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const location = useLocation();
+
+  // Get redirect URL
+  const params = new URLSearchParams(location.search);
+  const redirectTo = params.get("redirect") || "/home";
 
   const { signup } = useAuthStore();
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -20,7 +26,6 @@ const SignUp = () => {
     confirmPassword: "",
   });
 
-  // Signup
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -39,7 +44,7 @@ const SignUp = () => {
 
     try {
       await signup(formData.name, formData.email, formData.password);
-      navigate("/home");
+      navigate(redirectTo); // 🔥 redirect back
     } catch (err) {
       setError(err.message || "Signup failed");
     } finally {
@@ -50,6 +55,7 @@ const SignUp = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full">
+
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center justify-center">
             <Code className="h-10 w-10 text-blue-600 mx-auto" />
@@ -59,6 +65,7 @@ const SignUp = () => {
         </div>
 
         <div className="bg-white shadow-lg p-8 rounded-lg">
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex">
               <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0" />
@@ -67,7 +74,7 @@ const SignUp = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Full Name */}
+
             <div>
               <label className="text-sm font-medium block mb-2">Full Name</label>
               <div className="relative">
@@ -85,7 +92,6 @@ const SignUp = () => {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="text-sm font-medium block mb-2">Email</label>
               <div className="relative">
@@ -103,7 +109,6 @@ const SignUp = () => {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="text-sm font-medium block mb-2">Password</label>
               <div className="relative">
@@ -118,17 +123,21 @@ const SignUp = () => {
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="••••••••"
                 />
+
                 <button
                   type="button"
                   className="absolute right-3 top-3"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="text-sm font-medium block mb-2">Confirm Password</label>
               <div className="relative">
@@ -146,12 +155,17 @@ const SignUp = () => {
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="••••••••"
                 />
+
                 <button
                   type="button"
                   className="absolute right-3 top-3"
                   onClick={() => setShowConfirm(!showConfirm)}
                 >
-                  {showConfirm ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                  {showConfirm ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
                 </button>
               </div>
             </div>
@@ -159,7 +173,7 @@ const SignUp = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
             >
               {loading ? "Creating Account..." : "Create Account"}
             </button>
@@ -167,8 +181,14 @@ const SignUp = () => {
 
           <p className="mt-6 text-center text-sm text-gray-600">
             Already registered?
-            <Link to="/login" className="text-blue-600 ml-1 hover:underline font-semibold">Login</Link>
+            <Link
+              to={`/login?redirect=${redirectTo}`}
+              className="text-blue-600 ml-1 hover:underline font-semibold"
+            >
+              Login
+            </Link>
           </p>
+
         </div>
       </div>
     </div>

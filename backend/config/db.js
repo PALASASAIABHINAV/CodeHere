@@ -36,7 +36,7 @@ const createUsersTable = async () => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `;
-  
+
   try {
     await pool.query(query);
     console.log('✅ Users table created/verified');
@@ -45,8 +45,30 @@ const createUsersTable = async () => {
   }
 };
 
+// Create user_problem_status table if not exists
+const createUserProblemStatusTable = async () => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS user_problem_status (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      problem_id INTEGER NOT NULL,
+      status VARCHAR(50) NOT NULL CHECK (status IN ('solved', 'attempted')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, problem_id)
+    );
+  `;
+
+  try {
+    await pool.query(query);
+    console.log('✅ User problem status table created/verified');
+  } catch (err) {
+    console.error('❌ Error creating user_problem_status table:', err);
+  }
+};
+
 // Initialize database tables
 createUsersTable();
+createUserProblemStatusTable();
 
 
 

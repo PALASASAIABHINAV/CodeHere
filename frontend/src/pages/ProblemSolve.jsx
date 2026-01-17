@@ -1,13 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Send, CheckCircle, XCircle, Clock, ArrowLeft, Code2, Eye } from 'lucide-react';
+import { Play, Send, CheckCircle, XCircle, Clock, ArrowLeft, Code2, Eye, Lock, Save } from 'lucide-react';
+import { useAuthStore } from '../store/authStore';
+import Editor from "@monaco-editor/react";
+import debounce from 'lodash/debounce';
 
 // Helper function to get default code template
 const getDefaultTemplate = (problem, language) => {
   if (language === 'javascript') {
-    return problem.template_js || problem.starter_code_js || `// Write your solution here\nvar solution = function() {\n    \n};`;
+    return problem.template_js || `/**
+ * @param {number[]} nums
+ * @param {number} target
+ * @return {number[]}
+ */
+var twoSum = function(nums, target) {
+    // Write your code here
+    
+};`;
   } else if (language === 'cpp') {
-    return problem.template_cpp || problem.starter_code_cpp || `// Write your solution here\nclass Solution {\npublic:\n    \n};`;
+    return problem.template_cpp || `class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // Write your code here
+        
+    }
+};`;
   }
   return '// Write your code here';
 };
@@ -15,7 +32,7 @@ const getDefaultTemplate = (problem, language) => {
 const ProblemSolve = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  
+
   const [problem, setProblem] = useState(null);
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('javascript');
@@ -25,6 +42,10 @@ const ProblemSolve = () => {
   const [loading, setLoading] = useState(false);
   const [selectedTestCase, setSelectedTestCase] = useState(0);
   const [showTestCaseDetails, setShowTestCaseDetails] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 🔥 NEW: saved, saving, error
+  const { user } = useAuthStore();
+
+  const editorRef = useRef(null);
 
   useEffect(() => {
     fetchProblem();
@@ -37,15 +58,17 @@ const ProblemSolve = () => {
         { credentials: 'include' }
       );
       const data = await response.json();
-      
+
       if (data.success) {
         setProblem(data.problem);
-        
-        // Load last accepted code if user solved it, otherwise load template
-        if (data.problem.lastAcceptedCode) {
-          setCode(data.problem.lastAcceptedCode);
+
+        // 🔥 Load language-specific code: Auto-saved > Template
+        // Never mix languages (e.g., don't show C++ code in JS editor)
+        const currentLang = language;
+        if (data.problem.autoSavedCode && data.problem.autoSavedCode[currentLang]) {
+          setCode(data.problem.autoSavedCode[currentLang].code);
         } else {
-          setCode(getDefaultTemplate(data.problem, language));
+          setCode(getDefaultTemplate(data.problem, currentLang));
         }
       }
     } catch (error) {
@@ -53,10 +76,61 @@ const ProblemSolve = () => {
     }
   };
 
-  const handleLanguageChange = (newLang) => {
+  // 🔥 Auto-save function (debounced)
+  const autoSaveCode = useCallback(
+    debounce(async (codeToSave, lang, probId) => {
+      if (!user || !codeToSave || !probId) return;
+
+      setAutoSaveStatus('saving');
+
+      try {
+        const response = await fetch('http://localhost:5000/api/dsa/autosave', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: codeToSave,
+            language: lang,
+            problemId: probId,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          setAutoSaveStatus('saved');
+        } else {
+          setAutoSaveStatus('error');
+        }
+      } catch (error) {
+        console.error('Auto-save error:', error);
+        setAutoSaveStatus('error');
+      }
+    }, 2000), // Save after 2 seconds of inactivity
+    [user]
+  );
+
+  // Handle code change
+  const handleCodeChange = (value) => {
+    setCode(value);
+
+    // Trigger auto-save
+    if (user && problem) {
+      autoSaveCode(value, language, problem.id);
+    }
+  };
+
+  const handleLanguageChange = async (newLang) => {
     setLanguage(newLang);
+
     if (problem) {
-      setCode(getDefaultTemplate(problem, newLang));
+      // Load auto-saved code for this language if exists, otherwise use template
+      // Never show code from a different language
+      if (problem.autoSavedCode && problem.autoSavedCode[newLang]) {
+        setCode(problem.autoSavedCode[newLang].code);
+      } else {
+        setCode(getDefaultTemplate(problem, newLang));
+      }
     }
   };
 
@@ -114,8 +188,7 @@ const ProblemSolve = () => {
       const data = await response.json();
       setSubmitResult(data);
       setActiveTab('result');
-      
-      // Refresh problem to update status
+
       if (data.allPassed) {
         setTimeout(fetchProblem, 1000);
       }
@@ -178,49 +251,76 @@ const ProblemSolve = () => {
           {problem.userStatus === 'solved' && (
             <CheckCircle className="h-5 w-5 text-green-400" />
           )}
+
+          {/* 🔥 Auto-save indicator */}
+          {user && (
+            <div className="flex items-center gap-2 text-sm">
+              {autoSaveStatus === 'saving' && (
+                <span className="text-blue-400 flex items-center gap-1">
+                  <Clock className="h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              )}
+              {autoSaveStatus === 'saved' && (
+                <span className="text-green-400 flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Saved
+                </span>
+              )}
+              {autoSaveStatus === 'error' && (
+                <span className="text-red-400 flex items-center gap-1">
+                  <XCircle className="h-4 w-4" />
+                  Error
+                </span>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="flex gap-3">
-          <button
-            onClick={handleRun}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            <Play className="h-4 w-4" />
-            {loading && !submitResult ? 'Running...' : 'Run'}
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            <Send className="h-4 w-4" />
-            {loading && submitResult === null && testResult === null ? 'Submitting...' : 'Submit'}
-          </button>
+          {user && (
+            <>
+              <button
+                onClick={handleRun}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition disabled:opacity-50"
+              >
+                <Play className="h-4 w-4" />
+                {loading ? 'Running...' : 'Run'}
+              </button>
+
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+                {loading ? 'Submitting...' : 'Submit'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Split View */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel */}
-        <div className="w-1/2 border-r border-gray-700 flex flex-col">
-          {/* Tabs */}
+        {/* Left Panel - Problem Description */}
+        <div className="w-1/2 flex flex-col bg-gray-900 border-r border-gray-700">
           <div className="bg-gray-800 border-b border-gray-700 flex">
             {['description', 'submissions', testResult || submitResult ? 'result' : null].filter(Boolean).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 capitalize ${
-                  activeTab === tab
-                    ? 'bg-gray-900 border-b-2 border-blue-500 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
+                className={`px-4 py-2 capitalize ${activeTab === tab
+                  ? 'bg-gray-900 border-b-2 border-blue-500 text-white'
+                  : 'text-gray-400 hover:text-white'
+                  }`}
               >
                 {tab}
               </button>
             ))}
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 bg-gray-900">
             {activeTab === 'description' && (
               <div className="space-y-6">
@@ -248,6 +348,49 @@ const ProblemSolve = () => {
                     </div>
                   ))}
                 </div>
+
+                {problem.constraints && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Constraints</h3>
+                    <pre className="bg-gray-800 p-4 rounded-lg border border-gray-700 whitespace-pre-line text-gray-300">
+                      {problem.constraints}
+                    </pre>
+                  </div>
+                )}
+
+                {problem.acceptance && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Acceptance Rate</h3>
+                    <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-300">{problem.acceptance}%</span>
+                        <span className="text-sm text-gray-400">of submissions accepted</span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all"
+                          style={{ width: `${problem.acceptance}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {problem.hints && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-blue-400">Hints</h3>
+                    <div className="space-y-2">
+                      {problem.hints.split(",").map((hint, idx) => (
+                        <details key={idx} className="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                          <summary className="cursor-pointer text-gray-300 hover:text-white font-medium">
+                            💡 Hint {idx + 1}
+                          </summary>
+                          <p className="mt-2 text-gray-400 pl-4">{hint.trim()}</p>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-lg font-semibold mb-3 text-blue-400">Tags</h3>
@@ -289,9 +432,8 @@ const ProblemSolve = () => {
                             ) : (
                               <XCircle className="h-5 w-5 text-red-400" />
                             )}
-                            <span className={`font-semibold ${
-                              sub.status === 'Accepted' ? 'text-green-400' : 'text-red-400'
-                            }`}>
+                            <span className={`font-semibold ${sub.status === 'Accepted' ? 'text-green-400' : 'text-red-400'
+                              }`}>
                               {sub.status}
                             </span>
                           </div>
@@ -326,11 +468,10 @@ const ProblemSolve = () => {
             {activeTab === 'result' && (
               <div className="space-y-4">
                 {testResult && (
-                  <div className={`p-4 rounded-lg border-2 ${
-                    testResult.passed
-                      ? 'bg-green-900/20 border-green-700'
-                      : 'bg-red-900/20 border-red-700'
-                  }`}>
+                  <div className={`p-4 rounded-lg border-2 ${testResult.passed
+                    ? 'bg-green-900/20 border-green-700'
+                    : 'bg-red-900/20 border-red-700'
+                    }`}>
                     <div className="flex items-center gap-3 mb-4">
                       {testResult.passed ? (
                         <CheckCircle className="h-6 w-6 text-green-400" />
@@ -339,7 +480,7 @@ const ProblemSolve = () => {
                       )}
                       <span className="text-lg font-semibold">{testResult.status}</span>
                     </div>
-                    
+
                     {testResult.error ? (
                       <div className="bg-gray-800 p-3 rounded">
                         <p className="text-red-300 font-mono text-sm">{testResult.error}</p>
@@ -361,9 +502,8 @@ const ProblemSolve = () => {
                           </div>
                           <div>
                             <p className="text-sm text-gray-400 mb-1">Your Output:</p>
-                            <pre className={`p-3 rounded text-sm ${
-                              testResult.passed ? 'bg-green-900/30' : 'bg-red-900/30'
-                            }`}>
+                            <pre className={`p-3 rounded text-sm ${testResult.passed ? 'bg-green-900/30' : 'bg-red-900/30'
+                              }`}>
                               {testResult.testCase.actualOutput}
                             </pre>
                           </div>
@@ -381,11 +521,10 @@ const ProblemSolve = () => {
                 )}
 
                 {submitResult && (
-                  <div className={`p-4 rounded-lg border-2 ${
-                    submitResult.allPassed
-                      ? 'bg-green-900/20 border-green-700'
-                      : 'bg-red-900/20 border-red-700'
-                  }`}>
+                  <div className={`p-4 rounded-lg border-2 ${submitResult.allPassed
+                    ? 'bg-green-900/20 border-green-700'
+                    : 'bg-red-900/20 border-red-700'
+                    }`}>
                     <div className="flex items-center gap-3 mb-4">
                       {submitResult.allPassed ? (
                         <CheckCircle className="h-6 w-6 text-green-400" />
@@ -394,7 +533,7 @@ const ProblemSolve = () => {
                       )}
                       <span className="text-lg font-semibold">{submitResult.status}</span>
                     </div>
-                    
+
                     <div className="space-y-2 mb-4">
                       <p className="text-gray-300">
                         Test Cases Passed: <span className="font-semibold">{submitResult.testsPassed} / {submitResult.totalTests}</span>
@@ -426,57 +565,135 @@ const ProblemSolve = () => {
         </div>
 
         {/* Right Panel - Code Editor */}
-        <div className="w-1/2 flex flex-col bg-gray-900">
-          <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center">
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleLanguageChange('javascript')}
-                className={`px-3 py-1 text-sm rounded transition ${
-                  language === 'javascript'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                JavaScript
-              </button>
-              <button
-                onClick={() => handleLanguageChange('cpp')}
-                className={`px-3 py-1 text-sm rounded transition ${
-                  language === 'cpp'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-                title="C++ support coming soon"
-                disabled
-              >
-                C++
-              </button>
+        <div className="w-1/2 flex flex-col bg-gray-900 relative">
+          {!user && (
+            <div className="absolute inset-0 bg-gray-900/98 z-50 flex items-center justify-center backdrop-blur-md">
+              <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-gray-700 shadow-2xl">
+                <div className="absolute -top-12 -right-12 w-24 h-24 bg-blue-500/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl" />
+
+                <div className="relative z-10">
+                  <div className="flex justify-center mb-6">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/50">
+                      <Lock className="h-10 w-10 text-white" />
+                    </div>
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-center text-white mb-3">
+                    Login Required
+                  </h2>
+
+                  <p className="text-center text-gray-300 mb-8">
+                    Sign in to unlock the code editor and start solving this problem. Join thousands of developers improving their skills!
+                  </p>
+
+                  <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700">
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-gray-300">Write and test code in real-time</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-gray-300">Track your progress and submissions</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <svg className="w-3 h-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-sm text-gray-300">Cloud-saved code (auto-save)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)}
+                      className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 flex items-center justify-center gap-2"
+                    >
+                      <span>Login to Continue</span>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </button>
+
+                    <button
+                      onClick={() => navigate(`/signup?redirect=${encodeURIComponent(window.location.pathname)}`)}
+                      className="w-full py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 border border-gray-600"
+                    >
+                      Create Free Account
+                    </button>
+                  </div>
+
+                  <div className="mt-6 text-center">
+                    <p className="text-sm text-gray-400">
+                      Already have an account?{' '}
+                      <button
+                        onClick={() => navigate(`/login?redirect=${encodeURIComponent(window.location.pathname)}`)}
+                        className="text-blue-400 hover:text-blue-300 font-medium hover:underline"
+                      >
+                        Sign in now
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+          )}
+
+          <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex justify-between items-center">
+            <select
+              disabled={!user}
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+              className="px-3 py-1.5 bg-gray-700 text-gray-200 rounded disabled:opacity-50 font-medium"
+            >
+              <option value="javascript">
+                JavaScript (Node.js)
+              </option>
+              <option value="cpp">
+                C++ (GCC 11.2)
+              </option>
+            </select>
+
             <div className="flex gap-2 items-center">
               <button
                 onClick={() => setShowTestCaseDetails(!showTestCaseDetails)}
-                className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-2 transition"
+                disabled={!user}
+                className={`px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-2 transition ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Eye className="h-4 w-4" />
                 {showTestCaseDetails ? 'Hide' : 'Show'} Test Cases
               </button>
-              {problem.test_cases && problem.test_cases.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedTestCase(idx)}
-                  className={`px-3 py-1 text-sm rounded transition ${
-                    selectedTestCase === idx
+
+              {user && problem.test_cases && problem.test_cases
+                .slice(0, problem.locked_testcases || 3)
+                .map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedTestCase(idx)}
+                    className={`px-3 py-1 text-sm rounded transition ${selectedTestCase === idx
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Case {idx + 1}
-                </button>
-              ))}
+                      }`}
+                  >
+                    Case {idx + 1}
+                  </button>
+                ))}
             </div>
           </div>
 
-          {showTestCaseDetails && problem.test_cases && problem.test_cases[selectedTestCase] && (
+          {showTestCaseDetails && user && problem.test_cases && problem.test_cases[selectedTestCase] && (
             <div className="bg-gray-800 border-b border-gray-700 p-4">
               <div className="text-sm">
                 <p className="text-gray-400 mb-2">
@@ -500,12 +717,25 @@ const ProblemSolve = () => {
             </div>
           )}
 
-          <textarea
+          <Editor
+            height="100%"
+            language={language === "javascript" ? "javascript" : "cpp"}
+            theme="vs-dark"
             value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="flex-1 p-4 bg-gray-900 text-gray-100 font-mono text-sm focus:outline-none resize-none"
-            spellCheck="false"
-            placeholder="Write your code here..."
+            onChange={handleCodeChange}
+            onMount={(editor) => {
+              editorRef.current = editor;
+            }}
+            options={{
+              fontSize: 14,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              smoothScrolling: true,
+              automaticLayout: true,
+              tabSize: language === 'cpp' ? 4 : 2,
+              insertSpaces: true,
+              wordWrap: 'on',
+            }}
           />
         </div>
       </div>
