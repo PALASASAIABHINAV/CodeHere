@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Send, CheckCircle, XCircle, Clock, ArrowLeft, Code2, Eye, Lock, Save } from 'lucide-react';
+import { Play, Send, CheckCircle, XCircle, Clock, ArrowLeft, Code2, Eye, Lock, Save, RotateCcw } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import Editor from "@monaco-editor/react";
 import debounce from 'lodash/debounce';
@@ -131,6 +131,14 @@ const ProblemSolve = () => {
       } else {
         setCode(getDefaultTemplate(problem, newLang));
       }
+    }
+  };
+
+  // Reset code to template
+  const resetCode = () => {
+    if (window.confirm('Are you sure you want to reset the code to the template? All your changes will be lost.')) {
+      const template = getDefaultTemplate(problem, language);
+      setCode(template);
     }
   };
 
@@ -714,6 +722,17 @@ const ProblemSolve = () => {
                 C++ (GCC 11.2)
               </option>
             </select>
+
+            {/* Reset Code Button */}
+            {user && (
+              <button
+                onClick={resetCode}
+                className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded transition-colors ml-3"
+                title="Reset to Template"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
 
             <div className="flex gap-2 items-center">
               <button
