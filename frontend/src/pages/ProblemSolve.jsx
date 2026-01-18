@@ -358,23 +358,24 @@ const ProblemSolve = () => {
                   </div>
                 )}
 
-                {problem.acceptance && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 text-gray-900">Acceptance Rate</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-900">{problem.acceptance}%</span>
-                        <span className="text-sm text-gray-600">of submissions accepted</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full transition-all"
-                          style={{ width: `${problem.acceptance}%` }}
-                        ></div>
-                      </div>
+                {/* Always show acceptance section, even if 0% */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900">Acceptance Rate</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-900 font-bold">{problem.acceptance_rate}%</span>
+                      <span className="text-sm text-gray-600">
+                        {problem.total_accepted} accepted / {problem.total_submissions} submissions
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{ width: `${problem.acceptance_rate}%` }}
+                      ></div>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {problem.hints && (
                   <div>

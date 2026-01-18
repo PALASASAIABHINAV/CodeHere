@@ -222,6 +222,9 @@ const DsaProblems = () => {
 
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {problem.acceptance_rate}%
+                        <div className="text-xs text-gray-400 mt-1">
+                          {problem.total_submissions} Attempts
+                        </div>
                       </td>
 
                       <td className="px-6 py-4">

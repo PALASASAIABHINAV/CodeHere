@@ -4,38 +4,60 @@ class DsaProblem {
   // Get all problems with filters
   static async getAll(filters = {}) {
     try {
-      let query = 'SELECT * FROM dsa_problems WHERE 1=1';
+      let query = `
+        SELECT p.*, 
+        COUNT(s.id)::int as real_total_submissions,
+        COUNT(CASE WHEN s.status = 'Accepted' THEN 1 END)::int as real_total_accepted,
+        COUNT(DISTINCT s.user_id)::int as distinct_users
+        FROM dsa_problems p
+        LEFT JOIN user_submissions s ON p.id = s.problem_id
+        WHERE 1=1
+      `;
       const values = [];
       let paramCount = 1;
 
       if (filters.difficulty) {
-        query += ` AND difficulty = $${paramCount}`;
+        query += ` AND p.difficulty = $${paramCount}`;
         values.push(filters.difficulty);
         paramCount++;
       }
 
       if (filters.tag) {
-        query += ` AND $${paramCount} = ANY(tags)`;
+        query += ` AND $${paramCount} = ANY(p.tags)`;
         values.push(filters.tag);
         paramCount++;
       }
 
       if (filters.company) {
-        query += ` AND $${paramCount} = ANY(companies)`;
+        query += ` AND $${paramCount} = ANY(p.companies)`;
         values.push(filters.company);
         paramCount++;
       }
 
       if (filters.search) {
-        query += ` AND title ILIKE $${paramCount}`;
+        query += ` AND p.title ILIKE $${paramCount}`;
         values.push(`%${filters.search}%`);
         paramCount++;
       }
 
-      query += ' ORDER BY id ASC';
+      query += ' GROUP BY p.id ORDER BY p.id ASC';
 
       const result = await pool.query(query, values);
-      return result.rows;
+
+      return result.rows.map(row => {
+        // Calculate real acceptance rate
+        const submissions = row.real_total_submissions || 0;
+        const accepted = row.real_total_accepted || 0;
+        const rate = submissions > 0 ? ((accepted / submissions) * 100).toFixed(1) : '0.0';
+
+        return {
+          ...row,
+          total_submissions: submissions,
+          total_accepted: accepted,
+          acceptance_rate: rate, // Overwrite with real calc
+          distinct_users: row.distinct_users
+        };
+      });
     } catch (error) {
       throw error;
     }
@@ -44,9 +66,29 @@ class DsaProblem {
   // Get problem by slug
   static async getBySlug(slug) {
     try {
-      const query = 'SELECT * FROM dsa_problems WHERE slug = $1';
+      const query = `
+        SELECT p.*, 
+        COUNT(s.id)::int as real_total_submissions,
+        COUNT(CASE WHEN s.status = 'Accepted' THEN 1 END)::int as real_total_accepted,
+        COUNT(DISTINCT s.user_id)::int as distinct_users
+        FROM dsa_problems p
+        LEFT JOIN user_submissions s ON p.id = s.problem_id
+        WHERE p.slug = $1
+        GROUP BY p.id
+      `;
       const result = await pool.query(query, [slug]);
-      return result.rows[0];
+      const row = result.rows[0];
+
+      if (row) {
+        const submissions = row.real_total_submissions || 0;
+        const accepted = row.real_total_accepted || 0;
+        const rate = submissions > 0 ? ((accepted / submissions) * 100).toFixed(1) : '0.0';
+
+        row.total_submissions = submissions;
+        row.total_accepted = accepted;
+        row.acceptance_rate = rate;
+      }
+      return row;
     } catch (error) {
       throw error;
     }
