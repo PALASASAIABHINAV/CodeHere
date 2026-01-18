@@ -312,7 +312,7 @@ const executeCppCode = async (code, testCase) => {
         content: completeProgram
       }]
     }, {
-      timeout: 10000 // 10 seconds
+      timeout: 60000 // 60 seconds (Wait for "estimated time")
     });
 
     const output = response.data.run.output || '';

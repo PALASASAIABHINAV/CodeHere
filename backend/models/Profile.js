@@ -119,13 +119,12 @@ class Profile {
         return await Profile.updateStreak(userId);
     }
 
-    // Get heatmap data
     static async getHeatmapData(userId) {
         try {
             const query = `
         SELECT 
           DATE(submitted_at) as date,
-          COUNT(*) as count
+          COUNT(*)::int as count
         FROM user_submissions
         WHERE user_id = $1 AND status = 'Accepted'
         GROUP BY DATE(submitted_at)
