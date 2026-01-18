@@ -22,7 +22,14 @@ class DsaProblem {
         paramCount++;
       }
 
-      if (filters.tag) {
+      // 🔥 NEW: Multi-tag filtering with OR logic (any tag matches)
+      if (filters.tags && filters.tags.length > 0) {
+        const tagPlaceholders = filters.tags.map((_, i) => `$${paramCount + i}`).join(',');
+        query += ` AND p.tags && ARRAY[${tagPlaceholders}]::varchar[]`; // Cast to varchar[] to match column type
+        values.push(...filters.tags);
+        paramCount += filters.tags.length;
+      } else if (filters.tag) {
+        // Fallback for backward compatibility
         query += ` AND $${paramCount} = ANY(p.tags)`;
         values.push(filters.tag);
         paramCount++;
@@ -40,7 +47,32 @@ class DsaProblem {
         paramCount++;
       }
 
-      query += ' GROUP BY p.id ORDER BY p.id ASC';
+      query += ' GROUP BY p.id';
+
+      // 🔥 NEW: Sorting
+      const validSorts = ['title', 'difficulty', 'acceptance', 'submissions'];
+      const sortField = filters.sort && validSorts.includes(filters.sort) ? filters.sort : 'id';
+      const sortOrder = filters.order === 'desc' ? 'DESC' : 'ASC';
+
+      if (sortField === 'title') {
+        query += ` ORDER BY p.title ${sortOrder}`;
+      } else if (sortField === 'difficulty') {
+        // Custom difficulty ordering: Easy < Medium < Hard
+        query += ` ORDER BY CASE p.difficulty 
+          WHEN 'Easy' THEN 1 
+          WHEN 'Medium' THEN 2 
+          WHEN 'Hard' THEN 3 
+          ELSE 4 END ${sortOrder}`;
+      } else if (sortField === 'acceptance') {
+        // Sort by calculated acceptance rate
+        query += ` ORDER BY CASE WHEN COUNT(s.id) > 0 
+          THEN (COUNT(CASE WHEN s.status = 'Accepted' THEN 1 END)::float / COUNT(s.id)::float * 100) 
+          ELSE 0 END ${sortOrder}`;
+      } else if (sortField === 'submissions') {
+        query += ` ORDER BY COUNT(s.id) ${sortOrder}`;
+      } else {
+        query += ` ORDER BY p.id ${sortOrder}`;
+      }
 
       const result = await pool.query(query, values);
 

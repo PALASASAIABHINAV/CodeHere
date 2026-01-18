@@ -19,9 +19,12 @@ export const getAllProblems = async (req, res) => {
   try {
     const filters = {
       difficulty: req.query.difficulty,
-      tag: req.query.tag,
+      tag: req.query.tag, // Keep for backward compatibility
+      tags: req.query.tags ? (Array.isArray(req.query.tags) ? req.query.tags : req.query.tags.split(',')) : [], // NEW: Multi-tag support
       company: req.query.company,
       search: req.query.search,
+      sort: req.query.sort, // NEW: Sort field (title, difficulty, acceptance, submissions)
+      order: req.query.order || 'asc', // NEW: Sort order (asc/desc)
     };
 
     let problems = await DsaProblem.getAll(filters);
