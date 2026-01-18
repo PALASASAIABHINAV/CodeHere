@@ -56,7 +56,8 @@ export const updatePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     const userId = req.userId;
 
-    const user = await User.findById(userId);
+    // Use findByIdWithPassword to get the hash for comparison
+    const user = await User.findByIdWithPassword(userId);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     const valid = await User.comparePassword(currentPassword, user.password);
@@ -92,11 +93,11 @@ export const getProfileById = async (req, res) => {
   try {
     const userId = req.params.userId;
     if (req.params.userId === "me") {
-  return res.status(400).json({
-    success: false,
-    message: "Use /api/profile/me instead",
-  });
-}
+      return res.status(400).json({
+        success: false,
+        message: "Use /api/profile/me instead",
+      });
+    }
 
 
     const profile = await Profile.getProfile(userId);

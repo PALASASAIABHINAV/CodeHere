@@ -11,6 +11,8 @@ import ProblemSolve from "./pages/ProblemSolve";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/AdminDashboard";
+import Leaderboard from "./pages/Leaderboard";
+import AboutUs from "./pages/AboutUs"; // NEW
 import ProfilePictureGuard from "./components/ProfilePictureGuard";
 import { useAuthStore } from "./store/authStore";
 
@@ -36,6 +38,8 @@ function App() {
           <Route path="/profile/:userId" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/about" element={<AboutUs />} /> {/* NEW */}
         </Routes>
       </ProfilePictureGuard>
     </Router>

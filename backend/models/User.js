@@ -53,6 +53,17 @@ class User {
     }
   }
 
+  // Find user by ID (with password for auth checks)
+  static async findByIdWithPassword(id) {
+    try {
+      const query = 'SELECT * FROM users WHERE id = $1';
+      const result = await pool.query(query, [id]);
+      return result.rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Compare password for login
   static async comparePassword(plainPassword, hashedPassword) {
     return await bcrypt.compare(plainPassword, hashedPassword);
@@ -68,11 +79,12 @@ class User {
           u.email, 
           u.role, 
           u.is_prime, 
+          u.profile_picture_url,
           u.created_at,
           COUNT(DISTINCT ups.problem_id) FILTER (WHERE ups.status = 'solved') as solved_count
         FROM users u
         LEFT JOIN user_problem_status ups ON u.id = ups.user_id
-        GROUP BY u.id
+        GROUP BY u.id, u.profile_picture_url
         ORDER BY u.created_at DESC
       `;
       const result = await pool.query(query);

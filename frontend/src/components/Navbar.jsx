@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Menu, X, Code, User, Settings, LogOut, Crown } from "lucide-react";
+import { Menu, X, Code, User, Settings, LogOut, Crown, Trophy } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 
@@ -54,9 +54,12 @@ const Navbar = () => {
           {/* Desktop menu */}
           <div className="hidden md:flex items-center space-x-8">
             <Link to="/home" className="hover:text-blue-600">Home</Link>
-            <a href="#categories" className="hover:text-blue-600">Categories</a>
+            <Link to="/leaderboard" className="flex items-center gap-1 hover:text-blue-600">
+              <Trophy className="h-4 w-4" />
+              Leaderboard
+            </Link>
             <Link to="/prime" className="hover:text-blue-600">Prime</Link>
-            <a href="#features" className="hover:text-blue-600">Features</a>
+            <Link to="/about" className="hover:text-blue-600">About Us</Link>
           </div>
 
           {/* Right side */}
@@ -165,9 +168,12 @@ const Navbar = () => {
         <div className="md:hidden bg-white border-t">
           <div className="px-4 pt-2 pb-4 space-y-2">
             <Link to="/home" className="block py-2" onClick={() => setIsOpen(false)}>Home</Link>
-            <a href="#categories" className="block py-2" onClick={() => setIsOpen(false)}>Categories</a>
+            <Link to="/leaderboard" className="flex items-center gap-1 py-2" onClick={() => setIsOpen(false)}>
+              <Trophy className="h-4 w-4" />
+              Leaderboard
+            </Link>
             <Link to="/prime" className="block py-2" onClick={() => setIsOpen(false)}>Prime</Link>
-            <a href="#features" className="block py-2" onClick={() => setIsOpen(false)}>Features</a>
+            <Link to="/about" className="block py-2" onClick={() => setIsOpen(false)}>About Us</Link>
 
             {user ? (
               <>

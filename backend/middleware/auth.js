@@ -62,6 +62,32 @@ export const optionalAuth = (req, res, next) => {
     next();
   }
 };
+
+// Middleware to check if user is admin
+export const isAdmin = async (req, res, next) => {
+  try {
+    // Get user from database to check role
+    const result = await import('../config/db.js').then(module =>
+      module.default.query('SELECT role FROM users WHERE id = $1', [req.userId])
+    );
+
+    if (!result.rows[0] || result.rows[0].role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.',
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('Admin check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during authorization',
+    });
+  }
+};
+
 export const requirePrimeProfilePicture = async (req, res, next) => {
   const user = await User.getById(req.userId);
   if (user.is_prime && !user.profile_picture_url) {
