@@ -103,7 +103,7 @@ export const getProblemBySlug = async (req, res) => {
   }
 };
 
-// 🔥 Helper: Wrap JavaScript code with multi-input support
+// 🔥 Helper: Wrap JavaScript code with multi-input support (handles void/in-place functions + LinkedList)
 const wrapJavaScriptCode = (code, testCase) => {
   const functionMatch = code.match(/(?:var|let|const|function)\s+(\w+)\s*=/);
   const functionName = functionMatch ? functionMatch[1] : 'solution';
@@ -114,13 +114,50 @@ const wrapJavaScriptCode = (code, testCase) => {
     .map(line => line.trim())
     .filter(line => line !== '');
 
+  // 🔥 Detect if this is a LinkedList problem (only check the code, not input)
+  const isLinkedListProblem = code.includes('ListNode') || code.includes('Node');
+
   return `
+    // 🔥 ListNode Definition
+    function ListNode(val, next) {
+      this.val = (val === undefined ? 0 : val);
+      this.next = (next === undefined ? null : next);
+    }
+    
+    // 🔥 Helper: Convert array to linked list
+    function arrayToList(arr) {
+      if (!arr || arr.length === 0) return null;
+      let head = new ListNode(arr[0]);
+      let current = head;
+      for (let i = 1; i < arr.length; i++) {
+        current.next = new ListNode(arr[i]);
+        current = current.next;
+      }
+      return head;
+    }
+    
+    // 🔥 Helper: Convert linked list to array
+    function listToArray(head) {
+      let result = [];
+      let current = head;
+      while (current !== null) {
+        result.push(current.val);
+        current = current.next;
+      }
+      return result;
+    }
+    
     ${code}
     
     const inputs = ${JSON.stringify(inputs)};
-    const parsedInputs = inputs.map(input => {
+    const parsedInputs = inputs.map((input, idx) => {
       try {
-        return JSON.parse(input);
+        const parsed = JSON.parse(input);
+        // 🔥 Convert ALL array inputs to LinkedList if it's a LinkedList problem
+        if (Array.isArray(parsed) && ${isLinkedListProblem}) {
+          return arrayToList(parsed);
+        }
+        return parsed;
       } catch {
         if (!isNaN(input) && input !== '') {
           return Number(input);
@@ -129,12 +166,24 @@ const wrapJavaScriptCode = (code, testCase) => {
       }
     });
     
+    
     const result = ${functionName}(...parsedInputs);
-    JSON.stringify(result);
+    
+    // 🔥 FIX: Handle different return types
+    if (result === undefined && Array.isArray(parsedInputs[0])) {
+      // Void function with array
+      JSON.stringify(parsedInputs[0]);
+    } else if (${isLinkedListProblem} && (result === null || (result && result.val !== undefined))) {
+      // LinkedList result (including null) - convert to array
+      JSON.stringify(listToArray(result));
+    } else {
+      // Regular result
+      JSON.stringify(result);
+    }
   `;
 };
 
-// 🔥 Helper: Wrap C++ code with multi-input support
+// 🔥 Helper: Wrap C++ code with multi-input support (handles void/in-place functions)
 const wrapCppCode = (userCode, testCase) => {
   const inputs = testCase.input
     .trim()
@@ -142,19 +191,28 @@ const wrapCppCode = (userCode, testCase) => {
     .map(line => line.trim())
     .filter(line => line !== '');
 
+  // 🔥 FIX: Detect void functions in C++ code
+  const isVoidFunction = userCode.includes('void ') &&
+    (userCode.match(/void\s+\w+\s*\(/) !== null);
+
   // Parse expected output to determine return type
   let outputType = 'string';
-  try {
-    const parsed = JSON.parse(testCase.output);
-    if (Array.isArray(parsed)) {
-      outputType = 'vector';
-    } else if (typeof parsed === 'number') {
-      outputType = 'int';
-    } else if (typeof parsed === 'boolean') {
-      outputType = 'bool';
+
+  if (isVoidFunction) {
+    outputType = 'void';
+  } else {
+    try {
+      const parsed = JSON.parse(testCase.output);
+      if (Array.isArray(parsed)) {
+        outputType = 'vector';
+      } else if (typeof parsed === 'number') {
+        outputType = 'int';
+      } else if (typeof parsed === 'boolean') {
+        outputType = 'bool';
+      }
+    } catch (e) {
+      outputType = 'string';
     }
-  } catch (e) {
-    outputType = 'string';
   }
 
   // Helper functions for parsing and serializing
@@ -173,6 +231,37 @@ const wrapCppCode = (userCode, testCase) => {
 #include <queue>
 #include <stack>
 using namespace std;
+
+// 🔥 ListNode Definition for Linked List problems
+struct ListNode {
+    int val;
+    ListNode *next;
+    ListNode() : val(0), next(nullptr) {}
+    ListNode(int x) : val(x), next(nullptr) {}
+    ListNode(int x, ListNode *next) : val(x), next(next) {}
+};
+
+// 🔥 Helper: Convert vector to linked list
+ListNode* arrayToList(const vector<int>& arr) {
+    if (arr.empty()) return nullptr;
+    ListNode* head = new ListNode(arr[0]);
+    ListNode* current = head;
+    for (size_t i = 1; i < arr.size(); i++) {
+        current->next = new ListNode(arr[i]);
+        current = current->next;
+    }
+    return head;
+}
+
+// 🔥 Helper: Convert linked list to vector
+vector<int> listToVector(ListNode* head) {
+    vector<int> result;
+    while (head != nullptr) {
+        result.push_back(head->val);
+        head = head->next;
+    }
+    return result;
+}
 
 // JSON serialization helpers
 string vectorToJson(const vector<int>& vec) {
@@ -235,11 +324,19 @@ ${userCode}
 int main() {
     Solution solution;
     
+    // 🔥 Detect if this is a LinkedList problem
+    bool isLinkedListProblem = ${userCode.includes('ListNode')};
+    
     // Parse inputs
     ${inputs.map((input, idx) => {
     const trimmed = input.trim();
     // Detect input type: array, string, or number
     if (trimmed.startsWith('[')) {
+      if (userCode.includes('ListNode') || userCode.includes('Node')) {
+        // LinkedList problem - convert ALL array inputs to ListNode*
+        return `vector<int> input${idx}_vec = parseIntArray(R"(${input})");
+    ListNode* input${idx} = arrayToList(input${idx}_vec);`;
+      }
       return `vector<int> input${idx} = parseIntArray(R"(${input})");`;
     } else if (trimmed.startsWith('"') || isNaN(trimmed)) {
       // String input (quoted or non-numeric)
@@ -250,7 +347,16 @@ int main() {
     }
   }).join('\n    ')}
     
-    // Call solution
+    // Call solution and handle void/in-place modifications
+    ${outputType === 'void' ? `
+    solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+    // For void functions, output the modified first input
+    cout << vectorToJson(input0) << endl;
+    ` : userCode.includes('ListNode') ? `
+    auto result = solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+    // 🔥 LinkedList result - convert to JSON array
+    cout << vectorToJson(listToVector(result)) << endl;
+    ` : `
     auto result = solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
     
     // Output result as JSON
@@ -258,6 +364,8 @@ int main() {
       outputType === 'int' ? 'cout << result << endl;' :
         outputType === 'bool' ? 'cout << (result ? "true" : "false") << endl;' :
           'cout << "\\"" << result << "\\"" << endl;'}
+    `}
+    
     
     return 0;
 }
@@ -268,8 +376,18 @@ int main() {
 
 // Extract C++ function name from user code
 const extractCppFunctionName = (code) => {
-  // Match: returnType functionName(params)
-  const match = code.match(/\s+(\w+)\s*\([^)]*\)\s*{/);
+  // 🔥 FIX: Remove comments first to avoid matching function names in comments
+  const codeWithoutComments = code
+    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
+    .replace(/\/\/.*/g, '');           // Remove single-line comments
+
+  // Match: returnType functionName(params) {
+  // Look specifically for functions inside class Solution
+  const classMatch = codeWithoutComments.match(/class\s+Solution\s*{[\s\S]*?(\w+)\s*\([^)]*\)\s*{/);
+  if (classMatch) return classMatch[1];
+
+  // Fallback: general function pattern
+  const match = codeWithoutComments.match(/\s+(\w+)\s*\([^)]*\)\s*{/);
   return match ? match[1] : 'solve';
 };
 
