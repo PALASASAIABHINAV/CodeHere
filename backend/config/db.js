@@ -93,6 +93,28 @@ const addProfilePictureFields = async () => {
 // Initialize database tables
 createUsersTable();
 createUserProblemStatusTable();
+
+// Create submission_activity table if not exists (required for heatmap/stats)
+const createSubmissionActivityTable = async () => {
+  const query = `
+    CREATE TABLE IF NOT EXISTS submission_activity (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      count INTEGER DEFAULT 0,
+      UNIQUE(user_id, date)
+    );
+  `;
+
+  try {
+    await pool.query(query);
+    console.log('✅ Submission activity table created/verified');
+  } catch (err) {
+    console.error('❌ Error creating submission_activity table:', err);
+  }
+};
+
+createSubmissionActivityTable();
 addProfilePictureFields();
 
 

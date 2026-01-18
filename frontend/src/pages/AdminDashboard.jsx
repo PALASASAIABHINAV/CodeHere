@@ -158,33 +158,30 @@ const AdminDashboard = () => {
             <nav className="flex gap-8 px-6">
               <button
                 onClick={() => setActiveTab('stats')}
-                className={`py-4 border-b-2 font-medium transition ${
-                  activeTab === 'stats'
+                className={`py-4 border-b-2 font-medium transition ${activeTab === 'stats'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 <TrendingUp className="inline h-5 w-5 mr-2" />
                 Statistics
               </button>
               <button
                 onClick={() => setActiveTab('users')}
-                className={`py-4 border-b-2 font-medium transition ${
-                  activeTab === 'users'
+                className={`py-4 border-b-2 font-medium transition ${activeTab === 'users'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 <Users className="inline h-5 w-5 mr-2" />
                 Users
               </button>
               <button
                 onClick={() => setActiveTab('problems')}
-                className={`py-4 border-b-2 font-medium transition ${
-                  activeTab === 'problems'
+                className={`py-4 border-b-2 font-medium transition ${activeTab === 'problems'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 <FileCode className="inline h-5 w-5 mr-2" />
                 Problems
@@ -287,11 +284,10 @@ const AdminDashboard = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                            u.role === 'admin'
+                          className={`px-3 py-1 text-xs font-semibold rounded-full ${u.role === 'admin'
                               ? 'bg-purple-100 text-purple-800'
                               : 'bg-gray-100 text-gray-800'
-                          }`}
+                            }`}
                         >
                           {u.role}
                         </span>
@@ -312,21 +308,19 @@ const AdminDashboard = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleTogglePrime(u.id, u.is_prime)}
-                            className={`px-3 py-1 text-xs rounded ${
-                              u.is_prime
+                            className={`px-3 py-1 text-xs rounded ${u.is_prime
                                 ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                            }`}
+                              }`}
                           >
                             {u.is_prime ? 'Revoke Prime' : 'Grant Prime'}
                           </button>
                           <button
                             onClick={() => handleToggleRole(u.id, u.role)}
-                            className={`px-3 py-1 text-xs rounded ${
-                              u.role === 'admin'
+                            className={`px-3 py-1 text-xs rounded ${u.role === 'admin'
                                 ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                            }`}
+                              }`}
                           >
                             <Shield className="inline h-3 w-3 mr-1" />
                             {u.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
@@ -349,8 +343,8 @@ const AdminDashboard = () => {
 
         {/* Problems Tab */}
         {activeTab === 'problems' && (
-  <AdminProblemManager />
-)}
+          <AdminProblemManager />
+        )}
 
       </div>
     </div>
