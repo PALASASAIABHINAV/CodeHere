@@ -1,4 +1,4 @@
-// components/ActivityHeatmap.jsx
+// components/ActivityHeatmap.jsx - Enhanced version with stats
 import React, { useState, useMemo } from "react";
 
 const ActivityHeatmap = ({ heatmapData = [] }) => {
@@ -117,20 +117,78 @@ const ActivityHeatmap = ({ heatmapData = [] }) => {
   };
 
   const totalSubmissions = yearData.reduce((sum, h) => sum + h.count, 0);
+  const totalActiveDays = yearData.filter(h => h.count > 0).length;
+
+  // Calculate max streak and current streak
+  const calculateStreaks = () => {
+    const sortedDates = yearData
+      .filter(h => h.count > 0)
+      .map(h => new Date(h.date))
+      .sort((a, b) => a - b);
+
+    let maxStreak = 0;
+    let tempStreak = 1;
+
+    for (let i = 0; i < sortedDates.length; i++) {
+      if (i > 0) {
+        const dayDiff = Math.floor((sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24));
+
+        if (dayDiff === 1) {
+          tempStreak++;
+        } else {
+          maxStreak = Math.max(maxStreak, tempStreak);
+          tempStreak = 1;
+        }
+      }
+    }
+    maxStreak = Math.max(maxStreak, tempStreak);
+
+    // Calculate current streak (from today backwards)
+    let currentStreakCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let checkDate = new Date(today);
+
+    for (let i = 0; i < 365; i++) {
+      const isoDate = checkDate.toISOString().split('T')[0];
+      const found = yearData.find(h => h.date.startsWith(isoDate) && h.count > 0);
+
+      if (found) {
+        currentStreakCount++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (currentStreakCount > 0) {
+        break;
+      } else {
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+    }
+
+    return { maxStreak, currentStreakCount };
+  };
+
+  const { maxStreak, currentStreakCount } = calculateStreaks();
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   return (
-    <div className="bg-white rounded-lg border p-6 mt-6">
+    <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-6 shadow-sm">
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
+      {/* Header with stats */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-8">
           <h2 className="text-sm text-gray-600">
-            {totalSubmissions} Submissions in{" "}
-            <span className="text-blue-600 font-semibold cursor-pointer hover:underline">
-              {viewMode === "year" ? `Year ${selectedYear}` : `${monthNames[selectedMonth]} ${selectedYear}`}
-            </span>
+            <span className="text-xl font-black text-gray-900">{totalSubmissions}</span> submissions in the past one year
           </h2>
+          <div className="flex items-center gap-6 text-sm">
+            <div className="text-gray-600">
+              Total active days: <span className="font-bold text-gray-900">{totalActiveDays}</span>
+            </div>
+            <div className="text-gray-600">
+              Max streak: <span className="font-bold text-gray-900">{maxStreak}</span>
+            </div>
+            <div className="text-gray-600">
+              Current: <span className="font-bold text-gray-900">{currentStreakCount}</span>
+            </div>
+          </div>
         </div>
 
         {/* Year/Month Tabs */}

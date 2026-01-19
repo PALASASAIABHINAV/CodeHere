@@ -19,10 +19,14 @@ import {
   Share2,
   Camera,
   X,
-  Code
+  Code,
+  Award
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import ActivityHeatmap from '../components/ActivityHeatmap';
+import CircularProgress from '../components/CircularProgress';
+import PieChart from '../components/PieChart';
+import ActivityGraph from '../components/ActivityGraph';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -88,7 +92,7 @@ const Profile = () => {
 
   const fetchRank = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/leaderboard/rank/${profile.id}`, {
+      const response = await fetch(`http://localhost:5000/api/leaderboard/user/${profile.id}`, {
         credentials: 'include',
       });
       const data = await response.json();
@@ -211,9 +215,8 @@ const Profile = () => {
               <h3 className="text-sm font-medium text-gray-600">Global Rank</h3>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {rankData ? `#${rankData.rank}` : '-'}
+              {rankData ? `#${rankData.global_rank}` : '-'}
             </p>
-            {/* Removed Percentile as requested */}
             <div className="absolute -right-4 -bottom-4 opacity-10">
               <Trophy className="h-24 w-24 text-purple-600" />
             </div>
@@ -221,18 +224,19 @@ const Profile = () => {
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center gap-3 mb-2">
-              <Code className="h-6 w-6 text-green-600" />
-              <h3 className="text-sm font-medium text-gray-600">Solved</h3>
+              <TrendingUp className="h-6 w-6 text-blue-600" />
+              <h3 className="text-sm font-medium text-gray-600">CodeHere Score</h3>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{profile.solved_count || 0}</p>
+            <p className="text-3xl font-bold text-gray-900">{rankData ? rankData.total_points : 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Total Points</p>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center gap-3 mb-2">
-              <TrendingUp className="h-6 w-6 text-yellow-600" />
-              <h3 className="text-sm font-medium text-gray-600">Attempted</h3>
+              <Code className="h-6 w-6 text-green-600" />
+              <h3 className="text-sm font-medium text-gray-600">Problems Solved</h3>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{profile.attempted_count || 0}</p>
+            <p className="text-3xl font-bold text-gray-900">{profile.solved_count || 0}</p>
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6">
@@ -244,30 +248,91 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Difficulty Breakdown */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Problems Solved by Difficulty</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {['Easy', 'Medium', 'Hard'].map((difficulty) => (
-              <div key={difficulty}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-600">{difficulty}</span>
-                  <span className={`text-sm font-bold ${difficulty === 'Easy' ? 'text-green-600' :
-                    difficulty === 'Medium' ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                    {profile.solved_by_difficulty?.[difficulty] || 0}
-                  </span>
+        {/* Achievement Badges */}
+        {rankData && rankData.badges && rankData.badges.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-gray-200">
+            <h2 className="text-lg font-bold text-gray-700 mb-4">Badges</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {rankData.badges.map((badge, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col items-center p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:shadow-lg transition-all hover:scale-105"
+                >
+                  <span className="text-4xl mb-2">{badge.icon}</span>
+                  <span className="text-xs font-semibold text-gray-700 text-center">{badge.label}</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${difficulty === 'Easy' ? 'bg-green-600' :
-                      difficulty === 'Medium' ? 'bg-yellow-600' : 'bg-red-600'
-                      }`}
-                    style={{ width: `${Math.min((profile.solved_by_difficulty?.[difficulty] || 0) / 50 * 100, 100)}%` }}
-                  ></div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Category Rankings - Simplified */}
+        {rankData && (rankData.dsa_points > 0 || rankData.frontend_points > 0) && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-gray-200">
+            <h2 className="text-lg font-bold text-gray-700 mb-4">Category Rankings</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* DSA Ranking */}
+              {rankData.dsa_points > 0 && (
+                <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-green-700 mb-1">DSA</div>
+                      <div className="text-xs text-green-600">{rankData.problems_solved} problems solved</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-green-600">#{rankData.dsa_rank}</div>
+                      <div className="text-sm font-bold text-green-700">{rankData.dsa_points} pts</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )}
+
+              {/* Frontend Ranking */}
+              {rankData.frontend_points > 0 && (
+                <div className="p-5 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl border border-pink-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-pink-700 mb-1">Frontend</div>
+                      <div className="text-xs text-pink-600">{rankData.projects_completed} projects completed</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black text-pink-600">#{rankData.frontend_rank}</div>
+                      <div className="text-sm font-bold text-pink-700">{rankData.frontend_points} pts</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Problems Solved Section - Compact with Activity Graph */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-gray-200">
+          <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-gray-700">Problems Solved</h2>
+            {/* Optional: Add time range selector here if needed later */}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Circular Progress - Left Side */}
+            <div className="lg:col-span-1">
+              <CircularProgress
+                solved={profile.solved_count || 0}
+                total={profile.total_problems || 0}
+                easy={profile.easy_count || 0}
+                medium={profile.medium_count || 0}
+                hard={profile.hard_count || 0}
+                attempted={profile.attempted_count || 0}
+                totalEasy={profile.total_problems_by_difficulty?.Easy || 0}
+                totalMedium={profile.total_problems_by_difficulty?.Medium || 0}
+                totalHard={profile.total_problems_by_difficulty?.Hard || 0}
+              />
+            </div>
+
+            {/* Activity Graph - Right Side */}
+            <div className="lg:col-span-2">
+              <ActivityGraph data={profile.submission_activity} />
+            </div>
           </div>
         </div>
 

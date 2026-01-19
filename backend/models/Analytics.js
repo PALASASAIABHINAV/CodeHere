@@ -317,6 +317,375 @@ class Analytics {
             throw error;
         }
     }
+
+    // ==================== LEADERBOARD SYSTEM ====================
+
+    // Get DSA Leaderboard (Top 100 by DSA Points)
+    static async getDSALeaderboard(limit = 100) {
+        try {
+            const query = `
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.email,
+                    u.profile_picture_url,
+                    u.is_prime,
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN p.difficulty = 'Easy' THEN 10
+                            WHEN p.difficulty = 'Medium' THEN 15
+                            WHEN p.difficulty = 'Hard' THEN 20
+                            ELSE 0
+                        END
+                    ), 0)::int as dsa_points,
+                    COUNT(DISTINCT ups.problem_id)::int as problems_solved,
+                    COUNT(DISTINCT CASE WHEN p.difficulty = 'Easy' THEN ups.problem_id END)::int as easy_solved,
+                    COUNT(DISTINCT CASE WHEN p.difficulty = 'Medium' THEN ups.problem_id END)::int as medium_solved,
+                    COUNT(DISTINCT CASE WHEN p.difficulty = 'Hard' THEN ups.problem_id END)::int as hard_solved
+                FROM users u
+                LEFT JOIN user_problem_status ups ON u.id = ups.user_id AND ups.status = 'solved'
+                LEFT JOIN dsa_problems p ON ups.problem_id = p.id
+                GROUP BY u.id, u.name, u.email, u.profile_picture_url, u.is_prime
+                ORDER BY dsa_points DESC, problems_solved DESC
+                LIMIT $1
+            `;
+            const result = await pool.query(query, [limit]);
+
+            // Add rank to each user
+            return result.rows.map((user, index) => ({
+                ...user,
+                rank: index + 1
+            }));
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    // Get Frontend Leaderboard (Top 100 by Frontend Points)
+    static async getFrontendLeaderboard(limit = 100) {
+        try {
+            const query = `
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.email,
+                    u.profile_picture_url,
+                    u.is_prime,
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN fp.difficulty = 'Easy' THEN 50
+                            WHEN fp.difficulty = 'Medium' THEN 75
+                            WHEN fp.difficulty = 'Hard' THEN 100
+                            ELSE 0
+                        END
+                    ), 0)::int as frontend_points,
+                    COUNT(DISTINCT fs.project_id)::int as projects_completed,
+                    COUNT(DISTINCT CASE WHEN fp.difficulty = 'Easy' THEN fs.project_id END)::int as easy_completed,
+                    COUNT(DISTINCT CASE WHEN fp.difficulty = 'Medium' THEN fs.project_id END)::int as medium_completed,
+                    COUNT(DISTINCT CASE WHEN fp.difficulty = 'Hard' THEN fs.project_id END)::int as hard_completed
+                FROM users u
+                LEFT JOIN frontend_submissions fs ON u.id = fs.user_id AND fs.status = 'completed'
+                LEFT JOIN frontend_projects fp ON fs.project_id = fp.id
+                GROUP BY u.id, u.name, u.email, u.profile_picture_url, u.is_prime
+                ORDER BY frontend_points DESC, projects_completed DESC
+                LIMIT $1
+            `;
+            const result = await pool.query(query, [limit]);
+
+            // Add rank to each user
+            return result.rows.map((user, index) => ({
+                ...user,
+                rank: index + 1
+            }));
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    // Get Global Leaderboard (Top 100 by Total Points: DSA + Frontend)
+    static async getGlobalLeaderboard(limit = 100) {
+        try {
+            const query = `
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.email,
+                    u.profile_picture_url,
+                    u.is_prime,
+                    COALESCE(dsa_stats.dsa_points, 0)::int as dsa_points,
+                    COALESCE(frontend_stats.frontend_points, 0)::int as frontend_points,
+                    (COALESCE(dsa_stats.dsa_points, 0) + COALESCE(frontend_stats.frontend_points, 0))::int as total_points,
+                    COALESCE(dsa_stats.problems_solved, 0)::int as problems_solved,
+                    COALESCE(frontend_stats.projects_completed, 0)::int as projects_completed
+                FROM users u
+                LEFT JOIN (
+                    SELECT 
+                        ups.user_id,
+                        SUM(
+                            CASE 
+                                WHEN p.difficulty = 'Easy' THEN 10
+                                WHEN p.difficulty = 'Medium' THEN 15
+                                WHEN p.difficulty = 'Hard' THEN 20
+                                ELSE 0
+                            END
+                        ) as dsa_points,
+                        COUNT(DISTINCT ups.problem_id) as problems_solved
+                    FROM user_problem_status ups
+                    JOIN dsa_problems p ON ups.problem_id = p.id
+                    WHERE ups.status = 'solved'
+                    GROUP BY ups.user_id
+                ) dsa_stats ON u.id = dsa_stats.user_id
+                LEFT JOIN (
+                    SELECT 
+                        fs.user_id,
+                        SUM(
+                            CASE 
+                                WHEN fp.difficulty = 'Easy' THEN 50
+                                WHEN fp.difficulty = 'Medium' THEN 75
+                                WHEN fp.difficulty = 'Hard' THEN 100
+                                ELSE 0
+                            END
+                        ) as frontend_points,
+                        COUNT(DISTINCT fs.project_id) as projects_completed
+                    FROM frontend_submissions fs
+                    JOIN frontend_projects fp ON fs.project_id = fp.id
+                    WHERE fs.status = 'completed'
+                    GROUP BY fs.user_id
+                ) frontend_stats ON u.id = frontend_stats.user_id
+                ORDER BY total_points DESC, problems_solved DESC, projects_completed DESC
+                LIMIT $1
+            `;
+            const result = await pool.query(query, [limit]);
+
+            // Add rank to each user
+            return result.rows.map((user, index) => ({
+                ...user,
+                rank: index + 1
+            }));
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    // Get User's Comprehensive Rankings (DSA, Frontend, Global)
+    static async getUserRankings(userId) {
+        try {
+            // Get user's points
+            const userPointsQuery = `
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.profile_picture_url,
+                    u.is_prime,
+                    COALESCE(dsa_stats.dsa_points, 0)::int as dsa_points,
+                    COALESCE(frontend_stats.frontend_points, 0)::int as frontend_points,
+                    (COALESCE(dsa_stats.dsa_points, 0) + COALESCE(frontend_stats.frontend_points, 0))::int as total_points,
+                    COALESCE(dsa_stats.problems_solved, 0)::int as problems_solved,
+                    COALESCE(dsa_stats.easy_solved, 0)::int as easy_solved,
+                    COALESCE(dsa_stats.medium_solved, 0)::int as medium_solved,
+                    COALESCE(dsa_stats.hard_solved, 0)::int as hard_solved,
+                    COALESCE(frontend_stats.projects_completed, 0)::int as projects_completed,
+                    COALESCE(frontend_stats.easy_completed, 0)::int as easy_completed,
+                    COALESCE(frontend_stats.medium_completed, 0)::int as medium_completed,
+                    COALESCE(frontend_stats.hard_completed, 0)::int as hard_completed
+                FROM users u
+                LEFT JOIN (
+                    SELECT 
+                        ups.user_id,
+                        SUM(
+                            CASE 
+                                WHEN p.difficulty = 'Easy' THEN 10
+                                WHEN p.difficulty = 'Medium' THEN 15
+                                WHEN p.difficulty = 'Hard' THEN 20
+                                ELSE 0
+                            END
+                        ) as dsa_points,
+                        COUNT(DISTINCT ups.problem_id) as problems_solved,
+                        COUNT(DISTINCT CASE WHEN p.difficulty = 'Easy' THEN ups.problem_id END) as easy_solved,
+                        COUNT(DISTINCT CASE WHEN p.difficulty = 'Medium' THEN ups.problem_id END) as medium_solved,
+                        COUNT(DISTINCT CASE WHEN p.difficulty = 'Hard' THEN ups.problem_id END) as hard_solved
+                    FROM user_problem_status ups
+                    JOIN dsa_problems p ON ups.problem_id = p.id
+                    WHERE ups.status = 'solved'
+                    GROUP BY ups.user_id
+                ) dsa_stats ON u.id = dsa_stats.user_id
+                LEFT JOIN (
+                    SELECT 
+                        fs.user_id,
+                        SUM(
+                            CASE 
+                                WHEN fp.difficulty = 'Easy' THEN 50
+                                WHEN fp.difficulty = 'Medium' THEN 75
+                                WHEN fp.difficulty = 'Hard' THEN 100
+                                ELSE 0
+                            END
+                        ) as frontend_points,
+                        COUNT(DISTINCT fs.project_id) as projects_completed,
+                        COUNT(DISTINCT CASE WHEN fp.difficulty = 'Easy' THEN fs.project_id END) as easy_completed,
+                        COUNT(DISTINCT CASE WHEN fp.difficulty = 'Medium' THEN fs.project_id END) as medium_completed,
+                        COUNT(DISTINCT CASE WHEN fp.difficulty = 'Hard' THEN fs.project_id END) as hard_completed
+                    FROM frontend_submissions fs
+                    JOIN frontend_projects fp ON fs.project_id = fp.id
+                    WHERE fs.status = 'completed'
+                    GROUP BY fs.user_id
+                ) frontend_stats ON u.id = frontend_stats.user_id
+                WHERE u.id = $1
+            `;
+            const userResult = await pool.query(userPointsQuery, [userId]);
+
+            if (userResult.rows.length === 0) {
+                return null;
+            }
+
+            const userData = userResult.rows[0];
+
+            // Calculate DSA Rank
+            const dsaRankQuery = `
+                SELECT COUNT(*) + 1 as rank
+                FROM (
+                    SELECT 
+                        u.id,
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN p.difficulty = 'Easy' THEN 10
+                                WHEN p.difficulty = 'Medium' THEN 15
+                                WHEN p.difficulty = 'Hard' THEN 20
+                                ELSE 0
+                            END
+                        ), 0) as dsa_points,
+                        COUNT(DISTINCT ups.problem_id) as problems_solved
+                    FROM users u
+                    LEFT JOIN user_problem_status ups ON u.id = ups.user_id AND ups.status = 'solved'
+                    LEFT JOIN dsa_problems p ON ups.problem_id = p.id
+                    GROUP BY u.id
+                    HAVING COALESCE(SUM(
+                        CASE 
+                            WHEN p.difficulty = 'Easy' THEN 10
+                            WHEN p.difficulty = 'Medium' THEN 15
+                            WHEN p.difficulty = 'Hard' THEN 20
+                            ELSE 0
+                        END
+                    ), 0) > $1
+                    OR (
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN p.difficulty = 'Easy' THEN 10
+                                WHEN p.difficulty = 'Medium' THEN 15
+                                WHEN p.difficulty = 'Hard' THEN 20
+                                ELSE 0
+                            END
+                        ), 0) = $1
+                        AND COUNT(DISTINCT ups.problem_id) > $2
+                    )
+                ) ranked_users
+            `;
+            const dsaRankResult = await pool.query(dsaRankQuery, [userData.dsa_points, userData.problems_solved]);
+
+            // Calculate Frontend Rank
+            const frontendRankQuery = `
+                SELECT COUNT(*) + 1 as rank
+                FROM (
+                    SELECT 
+                        u.id,
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN fp.difficulty = 'Easy' THEN 50
+                                WHEN fp.difficulty = 'Medium' THEN 75
+                                WHEN fp.difficulty = 'Hard' THEN 100
+                                ELSE 0
+                            END
+                        ), 0) as frontend_points,
+                        COUNT(DISTINCT fs.project_id) as projects_completed
+                    FROM users u
+                    LEFT JOIN frontend_submissions fs ON u.id = fs.user_id AND fs.status = 'completed'
+                    LEFT JOIN frontend_projects fp ON fs.project_id = fp.id
+                    GROUP BY u.id
+                    HAVING COALESCE(SUM(
+                        CASE 
+                            WHEN fp.difficulty = 'Easy' THEN 50
+                            WHEN fp.difficulty = 'Medium' THEN 75
+                            WHEN fp.difficulty = 'Hard' THEN 100
+                            ELSE 0
+                        END
+                    ), 0) > $1
+                    OR (
+                        COALESCE(SUM(
+                            CASE 
+                                WHEN fp.difficulty = 'Easy' THEN 50
+                                WHEN fp.difficulty = 'Medium' THEN 75
+                                WHEN fp.difficulty = 'Hard' THEN 100
+                                ELSE 0
+                            END
+                        ), 0) = $1
+                        AND COUNT(DISTINCT fs.project_id) > $2
+                    )
+                ) ranked_users
+            `;
+            const frontendRankResult = await pool.query(frontendRankQuery, [userData.frontend_points, userData.projects_completed]);
+
+            // Calculate Global Rank
+            const globalRankQuery = `
+                SELECT COUNT(*) + 1 as rank
+                FROM (
+                    SELECT 
+                        u.id,
+                        (COALESCE(dsa_stats.dsa_points, 0) + COALESCE(frontend_stats.frontend_points, 0)) as total_points,
+                        COALESCE(dsa_stats.problems_solved, 0) as problems_solved,
+                        COALESCE(frontend_stats.projects_completed, 0) as projects_completed
+                    FROM users u
+                    LEFT JOIN (
+                        SELECT 
+                            ups.user_id,
+                            SUM(
+                                CASE 
+                                    WHEN p.difficulty = 'Easy' THEN 10
+                                    WHEN p.difficulty = 'Medium' THEN 15
+                                    WHEN p.difficulty = 'Hard' THEN 20
+                                    ELSE 0
+                                END
+                            ) as dsa_points,
+                            COUNT(DISTINCT ups.problem_id) as problems_solved
+                        FROM user_problem_status ups
+                        JOIN dsa_problems p ON ups.problem_id = p.id
+                        WHERE ups.status = 'solved'
+                        GROUP BY ups.user_id
+                    ) dsa_stats ON u.id = dsa_stats.user_id
+                    LEFT JOIN (
+                        SELECT 
+                            fs.user_id,
+                            SUM(
+                                CASE 
+                                    WHEN fp.difficulty = 'Easy' THEN 50
+                                    WHEN fp.difficulty = 'Medium' THEN 75
+                                    WHEN fp.difficulty = 'Hard' THEN 100
+                                    ELSE 0
+                                END
+                            ) as frontend_points,
+                            COUNT(DISTINCT fs.project_id) as projects_completed
+                        FROM frontend_submissions fs
+                        JOIN frontend_projects fp ON fs.project_id = fp.id
+                        WHERE fs.status = 'completed'
+                        GROUP BY fs.user_id
+                    ) frontend_stats ON u.id = frontend_stats.user_id
+                    WHERE (COALESCE(dsa_stats.dsa_points, 0) + COALESCE(frontend_stats.frontend_points, 0)) > $1
+                    OR (
+                        (COALESCE(dsa_stats.dsa_points, 0) + COALESCE(frontend_stats.frontend_points, 0)) = $1
+                        AND (COALESCE(dsa_stats.problems_solved, 0) + COALESCE(frontend_stats.projects_completed, 0)) > $2
+                    )
+                ) ranked_users
+            `;
+            const globalRankResult = await pool.query(globalRankQuery, [userData.total_points, userData.problems_solved + userData.projects_completed]);
+
+            return {
+                ...userData,
+                dsa_rank: parseInt(dsaRankResult.rows[0].rank),
+                frontend_rank: parseInt(frontendRankResult.rows[0].rank),
+                global_rank: parseInt(globalRankResult.rows[0].rank)
+            };
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 export default Analytics;

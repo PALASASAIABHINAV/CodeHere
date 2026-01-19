@@ -19,13 +19,48 @@ export const getMyProfile = async (req, res) => {
 
     const solvedByDifficulty = await Profile.getSolvedByDifficulty(userId);
     const streakData = await Profile.updateStreak(userId);
+    const submissionActivity = await Profile.getSubmissionActivity(userId);
+
+    // Get total problems count and breakdown by difficulty (ALL problems, including premium)
+    const { default: pool } = await import('../config/db.js');
+
+    // Total problems
+    const totalProblemsResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dsa_problems'
+    );
+    const totalProblems = parseInt(totalProblemsResult.rows[0].total);
+
+    // Problems by difficulty
+    const problemsByDifficultyResult = await pool.query(
+      'SELECT difficulty, COUNT(*) as count FROM dsa_problems GROUP BY difficulty'
+    );
+
+    const problemCounts = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0
+    };
+
+    problemsByDifficultyResult.rows.forEach(row => {
+      // Capitalize first letter to match frontend expectation if needed, or just map 'easy' -> 'Easy'
+      const diff = row.difficulty.charAt(0).toUpperCase() + row.difficulty.slice(1);
+      if (problemCounts[diff] !== undefined) {
+        problemCounts[diff] = parseInt(row.count);
+      }
+    });
 
     res.status(200).json({
       success: true,
       profile: {
         ...profile,
         solved_by_difficulty: solvedByDifficulty,
+        easy_count: solvedByDifficulty.Easy,
+        medium_count: solvedByDifficulty.Medium,
+        hard_count: solvedByDifficulty.Hard,
         ...streakData,
+        submission_activity: submissionActivity,
+        total_problems: totalProblems,
+        total_problems_by_difficulty: problemCounts,
       },
     });
   } catch (err) {
@@ -105,13 +140,47 @@ export const getProfileById = async (req, res) => {
 
     const solved = await Profile.getSolvedByDifficulty(userId);
     const streak = await Profile.getStreak(userId);
+    const submissionActivity = await Profile.getSubmissionActivity(userId);
+
+    // Get total problems count and breakdown by difficulty (ALL problems, including premium)
+    const { default: pool } = await import('../config/db.js');
+
+    // Total problems
+    const totalProblemsResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dsa_problems'
+    );
+    const totalProblems = parseInt(totalProblemsResult.rows[0].total);
+
+    // Problems by difficulty
+    const problemsByDifficultyResult = await pool.query(
+      'SELECT difficulty, COUNT(*) as count FROM dsa_problems GROUP BY difficulty'
+    );
+
+    const problemCounts = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0
+    };
+
+    problemsByDifficultyResult.rows.forEach(row => {
+      const diff = row.difficulty.charAt(0).toUpperCase() + row.difficulty.slice(1);
+      if (problemCounts[diff] !== undefined) {
+        problemCounts[diff] = parseInt(row.count);
+      }
+    });
 
     res.status(200).json({
       success: true,
       profile: {
         ...profile,
         solved_by_difficulty: solved,
+        easy_count: solved.Easy,
+        medium_count: solved.Medium,
+        hard_count: solved.Hard,
         ...streak,
+        submission_activity: submissionActivity,
+        total_problems: totalProblems,
+        total_problems_by_difficulty: problemCounts,
       },
     });
   } catch (err) {

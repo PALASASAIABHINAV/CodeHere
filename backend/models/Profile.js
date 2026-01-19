@@ -138,6 +138,27 @@ class Profile {
         }
     }
 
+    // Get submission activity (Accepted vs Failed) for graph
+    static async getSubmissionActivity(userId) {
+        try {
+            const query = `
+        SELECT 
+          DATE(submitted_at) as date,
+          COUNT(CASE WHEN status = 'Accepted' THEN 1 END)::int as accepted,
+          COUNT(CASE WHEN status != 'Accepted' THEN 1 END)::int as failed
+        FROM user_submissions
+        WHERE user_id = $1
+        GROUP BY DATE(submitted_at)
+        ORDER BY date ASC
+        LIMIT 30
+      `;
+            const result = await pool.query(query, [userId]);
+            return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
+
     // Update profile
     static async updateProfile(userId, data) {
         try {

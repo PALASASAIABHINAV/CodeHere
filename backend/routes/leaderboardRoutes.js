@@ -4,10 +4,11 @@ import { optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Public leaderboard (no auth required, but can be authenticated)
+// Public leaderboard with category support (?category=dsa|frontend|global)
 router.get('/', optionalAuth, getLeaderboard);
 
-// Get user's rank
-router.get('/rank/:userId', getUserRank);
+// Get user's comprehensive rankings
+router.get('/user/:userId', getUserRank);
 
 export default router;
+
