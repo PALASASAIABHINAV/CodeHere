@@ -146,7 +146,10 @@ export const getAllAnalytics = async (req, res) => {
             platformMetrics,
             acceptanceRateTrend,
             hourlyActivity,
-            statusDistribution
+            statusDistribution,
+            frontendProjectStats,
+            frontendSubmissionStats,
+            frontendTagStats
         ] = await Promise.all([
             Analytics.getUserGrowth(30),
             Analytics.getSubmissionTrends(30),
@@ -157,7 +160,10 @@ export const getAllAnalytics = async (req, res) => {
             Analytics.getPlatformMetrics(),
             Analytics.getAcceptanceRateTrend(30),
             Analytics.getHourlyActivity(),
-            Analytics.getStatusDistribution()
+            Analytics.getStatusDistribution(),
+            Analytics.getFrontendProjectStats(),
+            Analytics.getFrontendSubmissionStats(),
+            Analytics.getFrontendTagStats()
         ]);
 
         res.json({
@@ -172,7 +178,10 @@ export const getAllAnalytics = async (req, res) => {
                 platformMetrics,
                 acceptanceRateTrend,
                 hourlyActivity,
-                statusDistribution
+                statusDistribution,
+                frontendProjectStats,
+                frontendSubmissionStats,
+                frontendTagStats
             }
         });
     } catch (error) {

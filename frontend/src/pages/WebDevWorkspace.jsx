@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Editor from "@monaco-editor/react";
-import { ArrowLeft, Layout, Code2, Eye, Globe, Check, GripVertical, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Layout, Code2, Eye, Globe, Check, GripVertical, Clock, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import debounce from 'lodash/debounce';
 
@@ -181,6 +181,17 @@ const WebDevWorkspace = () => {
         }
     };
 
+    // Reset Code to Starter Template
+    const resetCode = () => {
+        if (!window.confirm('Are you sure you want to reset your code to the starter template? All your current code will be lost.')) {
+            return;
+        }
+
+        setHtmlCode(project.starter_html || '');
+        setCssCode(project.starter_css || '');
+        setJsCode(project.starter_js || '');
+    };
+
     if (loading || !project) return <div className="h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>;
 
     const allMet = requirements.every(r => r.met);
@@ -215,6 +226,17 @@ const WebDevWorkspace = () => {
                     </div>
                     <span className="text-xs font-mono w-12">{progress}%</span>
                 </div>
+
+                {/* Reset Button */}
+                <button
+                    onClick={resetCode}
+                    className="flex items-center gap-2 px-4 py-1.5 border-2 border-gray-600 text-gray-300 rounded-md hover:bg-gray-700 transition text-sm font-semibold"
+                >
+                    <RotateCcw className="w-4 h-4" />
+                    Reset
+                </button>
+
+                {/* Submit Button */}
                 <button
                     onClick={handleSubmit}
                     disabled={!allMet || submitting}

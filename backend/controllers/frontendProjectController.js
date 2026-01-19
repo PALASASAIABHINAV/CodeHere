@@ -89,3 +89,44 @@ export const submitProject = async (req, res) => {
         });
     }
 };
+
+// @desc    Create a new frontend project
+// @route   POST /api/frontend-projects
+// @access  Admin
+export const createProject = async (req, res) => {
+    try {
+        const project = await FrontendProject.create(req.body);
+        res.status(201).json({ success: true, project });
+    } catch (error) {
+        console.error('Create project error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Update a frontend project
+// @route   PUT /api/frontend-projects/:id
+// @access  Admin
+export const updateProject = async (req, res) => {
+    try {
+        const project = await FrontendProject.update(req.params.id, req.body);
+        if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
+        res.status(200).json({ success: true, project });
+    } catch (error) {
+        console.error('Update project error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Delete a frontend project
+// @route   DELETE /api/frontend-projects/:id
+// @access  Admin
+export const deleteProject = async (req, res) => {
+    try {
+        const result = await FrontendProject.delete(req.params.id);
+        if (!result) return res.status(404).json({ success: false, message: 'Project not found' });
+        res.status(200).json({ success: true, message: 'Project deleted' });
+    } catch (error) {
+        console.error('Delete project error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};

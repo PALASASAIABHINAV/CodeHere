@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { Code, Layout, Globe, ArrowRight, Clock, Star, Layers, Check } from 'lucide-react';
 
 const FrontendProjects = () => {
@@ -52,7 +54,9 @@ const FrontendProjects = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-900 pb-20">
+        <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
+            <Navbar />
+
             {/* Hero Section */}
             <div className="bg-white border-b border-gray-200 pt-16 pb-12 mb-10">
                 <div className="max-w-6xl mx-auto px-6">
@@ -129,6 +133,8 @@ const FrontendProjects = () => {
                     ))}
                 </div>
             </div>
+
+            <Footer />
         </div>
     );
 };

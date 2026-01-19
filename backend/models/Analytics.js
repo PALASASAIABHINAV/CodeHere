@@ -265,6 +265,58 @@ class Analytics {
             throw error;
         }
     }
+
+    // Frontend Project Analytics
+    static async getFrontendProjectStats() {
+        try {
+            const query = `
+                SELECT 
+                    difficulty,
+                    COUNT(*)::int as count
+                FROM frontend_projects
+                GROUP BY difficulty
+                ORDER BY difficulty ASC
+            `;
+            const result = await pool.query(query);
+            return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    static async getFrontendSubmissionStats() {
+        try {
+            const query = `
+                SELECT 
+                    status,
+                    COUNT(*)::int as count
+                FROM frontend_submissions
+                GROUP BY status
+            `;
+            const result = await pool.query(query);
+            return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    static async getFrontendTagStats() {
+        try {
+            const query = `
+                SELECT 
+                    tag,
+                    COUNT(*)::int as count
+                FROM frontend_projects, unnest(tags) as tag
+                GROUP BY tag
+                ORDER BY count DESC
+                LIMIT 10
+            `;
+            const result = await pool.query(query);
+            return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 export default Analytics;

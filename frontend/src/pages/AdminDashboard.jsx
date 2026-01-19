@@ -4,10 +4,11 @@ import Navbar from '../components/Navbar';
 import {
   Users, FileCode, TrendingUp, Activity, Crown, Shield,
   Calendar, BarChart3, PieChart, User, Eye, X, Medal,
-  Trash2, Edit, Plus, Search, Code
+  Trash2, Edit, Plus, Search, Code, Layout
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import AdminProblemManager from '../components/AdminProblemManager'; // Assuming this exists as before
+import AdminProblemManager from '../components/AdminProblemManager';
+import AdminFrontendManager from '../components/AdminFrontendManager';
 import {
   LineChart, Line, AreaChart, Area, BarChart, Bar,
   PieChart as RePieChart, Pie, Cell,
@@ -288,6 +289,15 @@ const AdminDashboard = () => {
                 }`}
             >
               <FileCode className="h-5 w-5" /> Problem Management
+            </button>
+            <button
+              onClick={() => setActiveTab('frontend')}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all ${activeTab === 'frontend'
+                ? 'bg-blue-50 text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:bg-gray-50'
+                }`}
+            >
+              <Layout className="h-5 w-5" /> Frontend Projects
             </button>
           </nav>
         </div>
@@ -621,6 +631,75 @@ const AdminDashboard = () => {
         {/* Problem Management Content */}
         {!loading && activeTab === 'problems' && (
           <AdminProblemManager />
+        )}
+
+        {/* Frontend Projects Management Content */}
+        {!loading && activeTab === 'frontend' && (
+          <div className="space-y-8">
+            {/* Analytics Charts */}
+            {analyticsData && analyticsData.frontendProjectStats && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Difficulty Distribution */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Difficulty Distribution</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <RePieChart>
+                      <Pie
+                        data={analyticsData.frontendProjectStats}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="count"
+                        label={({ difficulty, count }) => `${difficulty}: ${count}`}
+                      >
+                        {analyticsData.frontendProjectStats.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[entry.difficulty] || '#8884d8'} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Submission Status */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Status</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={analyticsData.frontendSubmissionStats}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="status" tick={{ fontSize: 12 }} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]}>
+                        {analyticsData.frontendSubmissionStats?.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.status === 'completed' ? COLORS.success : COLORS.warning} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Popular Tags */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular Tags</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={analyticsData.frontendTagStats} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="tag" type="category" width={100} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Frontend Manager Component */}
+            <AdminFrontendManager />
+          </div>
         )}
       </div>
     </div>
