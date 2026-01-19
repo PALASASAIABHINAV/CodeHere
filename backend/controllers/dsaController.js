@@ -186,40 +186,15 @@ const wrapJavaScriptCode = (code, testCase) => {
   `;
 };
 
-// 🔥 Helper: Wrap C++ code with multi-input support (handles void/in-place functions)
-const wrapCppCode = (userCode, testCase) => {
-  const inputs = testCase.input
-    .trim()
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line !== '');
+// 🔥 OPTIMIZED: Batch C++ Wrapper
+// This generates a single C++ file that runs ALL test cases and prints outputs separated by a delimiter.
+const wrapCppCodeBatch = (userCode, testCases) => {
+  // Common parts
+  const isLinkedListProblem = userCode.includes('ListNode');
+  const functionName = extractCppFunctionName(userCode);
 
-  // 🔥 FIX: Detect void functions in C++ code
-  const isVoidFunction = userCode.includes('void ') &&
-    (userCode.match(/void\s+\w+\s*\(/) !== null);
-
-  // Parse expected output to determine return type
-  let outputType = 'string';
-
-  if (isVoidFunction) {
-    outputType = 'void';
-  } else {
-    try {
-      const parsed = JSON.parse(testCase.output);
-      if (Array.isArray(parsed)) {
-        outputType = 'vector';
-      } else if (typeof parsed === 'number') {
-        outputType = 'int';
-      } else if (typeof parsed === 'boolean') {
-        outputType = 'bool';
-      }
-    } catch (e) {
-      outputType = 'string';
-    }
-  }
-
-  // Helper functions for parsing and serializing
-  const helperCode = `
+  // Helper functions for parsing and serializing (Same as before)
+  const commonHeaders = `
 #include <iostream>
 #include <vector>
 #include <string>
@@ -321,61 +296,77 @@ string parseString(const string& input) {
     }
     return cleaned;
 }
+`;
+
+  // Generate test case runners
+  const testRunners = testCases.map((testCase, index) => {
+    const inputs = testCase.input.trim().split('\n').map(line => line.trim()).filter(line => line !== '');
+
+    // Determine output type for this test case
+    let outputType = 'string';
+    const isVoidFunction = userCode.includes('void ') && (userCode.match(/void\s+\w+\s*\(/) !== null);
+
+    if (isVoidFunction) {
+      outputType = 'void';
+    } else {
+      try {
+        const parsed = JSON.parse(testCase.output);
+        if (Array.isArray(parsed)) outputType = 'vector';
+        else if (typeof parsed === 'number') outputType = 'int';
+        else if (typeof parsed === 'boolean') outputType = 'bool';
+      } catch (e) { }
+    }
+
+    return `
+    {
+        // Test Case ${index}
+        ${inputs.map((input, idx) => {
+      const trimmed = input.trim();
+      if (trimmed.startsWith('[')) {
+        if (isLinkedListProblem) {
+          return `vector<int> input${idx}_vec = parseIntArray(R"(${input})");
+                        ListNode* input${idx} = arrayToList(input${idx}_vec);`;
+        }
+        return `vector<int> input${idx} = parseIntArray(R"(${input})");`;
+      } else if (trimmed.startsWith('"') || isNaN(trimmed)) {
+        return `string input${idx} = parseString(R"(${input})");`;
+      } else {
+        return `int input${idx} = parseInt(R"(${input})");`;
+      }
+    }).join('\n        ')}
+
+        ${outputType === 'void' ? `
+        solution.${functionName}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+        cout << vectorToJson(input0);
+        ` : isLinkedListProblem ? `
+        auto result = solution.${functionName}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+        cout << vectorToJson(listToVector(result));
+        ` : `
+        auto result = solution.${functionName}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
+        ${outputType === 'vector' ? 'cout << vectorToJson(result);' :
+        outputType === 'int' ? 'cout << result;' :
+          outputType === 'bool' ? 'cout << (result ? "true" : "false");' :
+            'cout << "\\"" << result << "\\"";'
+      }
+        `}
+        cout << "\\nBATCH_DELIMITER\\n";
+    }
+    `;
+  }).join('\n');
+
+  return `
+${commonHeaders}
 
 ${userCode}
 
 int main() {
     Solution solution;
-    
-    // 🔥 Detect if this is a LinkedList problem
-    bool isLinkedListProblem = ${userCode.includes('ListNode')};
-    
-    // Parse inputs
-    ${inputs.map((input, idx) => {
-    const trimmed = input.trim();
-    // Detect input type: array, string, or number
-    if (trimmed.startsWith('[')) {
-      if (userCode.includes('ListNode') || userCode.includes('Node')) {
-        // LinkedList problem - convert ALL array inputs to ListNode*
-        return `vector<int> input${idx}_vec = parseIntArray(R"(${input})");
-    ListNode* input${idx} = arrayToList(input${idx}_vec);`;
-      }
-      return `vector<int> input${idx} = parseIntArray(R"(${input})");`;
-    } else if (trimmed.startsWith('"') || isNaN(trimmed)) {
-      // String input (quoted or non-numeric)
-      return `string input${idx} = parseString(R"(${input})");`;
-    } else {
-      // Numeric input
-      return `int input${idx} = parseInt(R"(${input})");`;
-    }
-  }).join('\n    ')}
-    
-    // Call solution and handle void/in-place modifications
-    ${outputType === 'void' ? `
-    solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
-    // For void functions, output the modified first input
-    cout << vectorToJson(input0) << endl;
-    ` : userCode.includes('ListNode') ? `
-    auto result = solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
-    // 🔥 LinkedList result - convert to JSON array
-    cout << vectorToJson(listToVector(result)) << endl;
-    ` : `
-    auto result = solution.${extractCppFunctionName(userCode)}(${inputs.map((_, idx) => `input${idx}`).join(', ')});
-    
-    // Output result as JSON
-    ${outputType === 'vector' ? 'cout << vectorToJson(result) << endl;' :
-      outputType === 'int' ? 'cout << result << endl;' :
-        outputType === 'bool' ? 'cout << (result ? "true" : "false") << endl;' :
-          'cout << "\\"" << result << "\\"" << endl;'}
-    `}
-    
-    
+    ${testRunners}
     return 0;
 }
-  `;
-
-  return helperCode;
+`;
 };
+
 
 // Extract C++ function name from user code
 const extractCppFunctionName = (code) => {
@@ -415,13 +406,18 @@ public:
 };
 
 // 🔥 Execute C++ code using Piston API (Free, No Setup, Just Works!)
-const executeCppCode = async (code, testCase) => {
+// NOW SUPPORTS BATCHING
+const executeCppCode = async (code, testCases) => {
+  // Ensure testCases is an array
+  const isBatch = Array.isArray(testCases);
+  const casesToRun = isBatch ? testCases : [testCases];
+
   try {
-    // Step 1: Wrap user's function-only code in Solution class (LeetCode-style)
+    // Step 1: Wrap user's function-only code in Solution class
     const solutionClass = smartCppWrapper(code);
 
-    // Step 2: Wrap with complete program including main(), includes, and test harness
-    const completeProgram = wrapCppCode(solutionClass, testCase);
+    // Step 2: Wrap with complete program including main(), includes, and ALL test cases
+    const completeProgram = wrapCppCodeBatch(solutionClass, casesToRun);
 
     // Use Piston API - completely free, no signup, no Docker needed!
     // Public instance: https://emkc.org/api/v2/piston
@@ -444,14 +440,24 @@ const executeCppCode = async (code, testCase) => {
       throw new Error(stderr);
     }
 
-    // Piston might not give exact CPU time in free tier, so we simulate LeetCode-like speeds (5-45ms)
-    // proportional to code length or complexity if we wanted, but random is fine for "feeling"
-    const simulatedDuration = Math.floor(Math.random() * 40) + 5;
+    // Split output by delimiter to get results for each test case
+    const results = output.split('BATCH_DELIMITER').map(s => s.trim()).filter(s => s !== '');
 
-    return {
-      output: output.trim(),
-      duration: simulatedDuration
-    };
+    // Simulated duration per test case (just for UI feel, total is fast)
+    const simulatedDuration = Math.floor(Math.random() * 5) + 1;
+
+    if (isBatch) {
+      return results.map(res => ({
+        output: res,
+        duration: simulatedDuration
+      }));
+    } else {
+      return {
+        output: results[0] || '',
+        duration: simulatedDuration
+      };
+    }
+
   } catch (error) {
     // Check for timeout
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
@@ -520,7 +526,7 @@ export const runCode = async (req, res) => {
         runtime = Math.max(1, Math.round(ms)); // Ensure at least 1ms
       }
       else if (language === 'cpp') {
-        // Piston API handles raw C++ code directly - no wrapping needed
+        // Run single test case
         const execResult = await executeCppCode(code, testCase);
         result = execResult.output;
         runtime = execResult.duration;
@@ -607,72 +613,134 @@ export const submitCode = async (req, res) => {
     const results = [];
     let failedTestCase = null;
 
-    // Run all test cases
-    for (let i = 0; i < problem.test_cases.length; i++) {
-      const testCase = problem.test_cases[i];
-
+    // 🔥 OPTIMIZED: C++ Batch Execution
+    if (language === 'cpp') {
       try {
-        let result;
-        let runtime = 0;
+        // Run ALL test cases in ONE go
+        const batchResults = await executeCppCode(code, problem.test_cases);
 
-        if (language === 'javascript') {
-          const vm = new VM({
-            timeout: 3000,
-            sandbox: {}
+        // Correctly handling mismatch in results count (e.g. if code crashed in middle)
+        if (batchResults.length !== problem.test_cases.length) {
+          // If fewer results than cases, it effectively crashed or stopped early
+          throw new Error("Runtime Error: Code execution incomplete (possible crash)");
+        }
+
+        for (let i = 0; i < problem.test_cases.length; i++) {
+          const testCase = problem.test_cases[i];
+          const resultData = batchResults[i];
+
+          const result = resultData.output;
+          const runtime = resultData.duration;
+          totalRuntime += runtime;
+
+          const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
+          let normalizedActual = result.trim();
+          try {
+            normalizedActual = JSON.stringify(JSON.parse(result.trim()));
+          } catch (e) { }
+
+          const passed = normalizedActual === expectedOutput;
+
+          if (!passed) {
+            allPassed = false;
+            failedTestCase = i + 1;
+          }
+
+          results.push({
+            testCase: i + 1,
+            passed,
+            runtime,
+            input: testCase.input,
+            expectedOutput: testCase.output,
+            actualOutput: result,
           });
-          const wrappedCode = wrapJavaScriptCode(code, testCase);
 
-          const start = process.hrtime();
-          result = vm.run(wrappedCode);
-          const diff = process.hrtime(start);
-          const ms = (diff[0] * 1000 + diff[1] / 1e6);
-          runtime = Math.max(1, Math.round(ms));
-        }
-        else if (language === 'cpp') {
-          const execResult = await executeCppCode(code, testCase);
-          result = execResult.output;
-          runtime = execResult.duration;
-        }
-
-        totalRuntime += runtime;
-
-        const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
-        let normalizedActual = result.trim();
-        try {
-          normalizedActual = JSON.stringify(JSON.parse(result.trim()));
-        } catch (e) { }
-
-        const passed = normalizedActual === expectedOutput;
-
-        results.push({
-          testCase: i + 1,
-          passed,
-          runtime,
-          input: testCase.input,
-          expectedOutput: testCase.output,
-          actualOutput: result,
-        });
-
-        if (!passed) {
-          allPassed = false;
-          failedTestCase = i + 1;
-          break;
+          // Stop processing results if we found a failure? 
+          // Usually valid to continue processing to show all results, 
+          // but for "Failed" status we know it failed. 
+          // Piston ran them all anyway, so might as well show them.
         }
       } catch (error) {
-        allPassed = false;
-        failedTestCase = i + 1;
-        const isTimeout = error.message.includes('timeout') || error.killed;
+        // Handle compilation errors or crash that prevented partial output
         const isCompileError = error.message.includes('error:');
-
-        results.push({
-          testCase: i + 1,
-          passed: false,
-          error: error.message,
-          status: isTimeout ? 'Time Limit Exceeded' :
-            isCompileError ? 'Compilation Error' :
-              'Runtime Error',
+        return res.status(200).json({
+          success: true,
+          status: isCompileError ? 'Compilation Error' : 'Runtime Error',
+          allPassed: false,
+          testsPassed: 0,
+          totalTests: problem.test_cases.length,
+          runtime: 0,
+          results: [{
+            testCase: 1,
+            passed: false,
+            error: error.message
+          }],
+          failedTestCase: 1
         });
-        break;
+      }
+    } else {
+      // JavaScript Loop (Already fast locally)
+      for (let i = 0; i < problem.test_cases.length; i++) {
+        const testCase = problem.test_cases[i];
+
+        try {
+          let result;
+          let runtime = 0;
+
+          if (language === 'javascript') {
+            const vm = new VM({
+              timeout: 3000,
+              sandbox: {}
+            });
+            const wrappedCode = wrapJavaScriptCode(code, testCase);
+
+            const start = process.hrtime();
+            result = vm.run(wrappedCode);
+            const diff = process.hrtime(start);
+            const ms = (diff[0] * 1000 + diff[1] / 1e6);
+            runtime = Math.max(1, Math.round(ms));
+          }
+
+          totalRuntime += runtime;
+
+          const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
+          let normalizedActual = result.trim();
+          try {
+            normalizedActual = JSON.stringify(JSON.parse(result.trim()));
+          } catch (e) { }
+
+          const passed = normalizedActual === expectedOutput;
+
+          results.push({
+            testCase: i + 1,
+            passed,
+            runtime,
+            input: testCase.input,
+            expectedOutput: testCase.output,
+            actualOutput: result,
+          });
+
+          if (!passed) {
+            allPassed = false;
+            failedTestCase = i + 1;
+            break;
+          }
+        } catch (error) {
+          allPassed = false;
+          failedTestCase = i + 1;
+          const isTimeout = error.message.includes('timeout') || error.killed;
+          const isCompileError = error.message.includes('error:');
+
+          results.push({
+            testCase: i + 1,
+            passed: false,
+            error: error.message,
+            status: isTimeout ? 'Time Limit Exceeded' :
+              isCompileError ? 'Compilation Error' :
+                'Runtime Error',
+          });
+          break;
+        }
       }
     }
 

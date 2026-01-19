@@ -39,7 +39,9 @@ const ProblemSolve = () => {
   const [activeTab, setActiveTab] = useState('description');
   const [testResult, setTestResult] = useState(null);
   const [submitResult, setSubmitResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  // 🔥 REFACTOR: Split loading states
+  const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTestCase, setSelectedTestCase] = useState(0);
   const [showTestCaseDetails, setShowTestCaseDetails] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState('saved'); // 🔥 NEW: saved, saving, error
@@ -143,7 +145,7 @@ const ProblemSolve = () => {
   };
 
   const handleRun = async () => {
-    setLoading(true);
+    setIsRunning(true);
     setTestResult(null);
     setSubmitResult(null);
 
@@ -172,12 +174,12 @@ const ProblemSolve = () => {
       });
       setActiveTab('result');
     } finally {
-      setLoading(false);
+      setIsRunning(false);
     }
   };
 
   const handleSubmit = async () => {
-    setLoading(true);
+    setIsSubmitting(true);
     setTestResult(null);
     setSubmitResult(null);
 
@@ -209,7 +211,7 @@ const ProblemSolve = () => {
       });
       setActiveTab('result');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -290,20 +292,20 @@ const ProblemSolve = () => {
             <>
               <button
                 onClick={handleRun}
-                disabled={loading}
+                disabled={isRunning || isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition disabled:opacity-50"
               >
-                <Play className="h-4 w-4" />
-                {loading ? 'Running...' : 'Run'}
+                {isRunning ? <Clock className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {isRunning ? 'Running...' : 'Run'}
               </button>
 
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={isRunning || isSubmitting}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50"
               >
-                <Send className="h-4 w-4" />
-                {loading ? 'Submitting...' : 'Submit'}
+                {isSubmitting ? <Clock className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {isSubmitting ? 'Submitting...' : 'Submit'}
               </button>
             </>
           )}
@@ -573,53 +575,7 @@ const ProblemSolve = () => {
           </div>
         </div>
 
-        {/* Professional Loading Overlay */}
-        {loading && (
-          <div className="fixed inset-0 bg-gray-900/60 z-[100] flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
-              {/* Background decoration */}
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-
-              <div className="mb-6 relative">
-                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center animate-pulse">
-                  <Code2 className="w-8 h-8 text-blue-600" />
-                </div>
-                <div className="absolute -bottom-1 -right-1 bg-green-500 w-4 h-4 rounded-full border-2 border-white"></div>
-              </div>
-
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Evaluating Solution
-              </h3>
-
-              <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                Running your code against <span className="font-semibold text-gray-900">{problem.test_cases.length} test cases</span>.
-                <br />This requires precision timing.
-              </p>
-
-              {/* Fake Progress Bar */}
-              <div className="w-full bg-gray-100 rounded-full h-2 mb-2 overflow-hidden">
-                <div
-                  className="bg-blue-600 h-full rounded-full transition-all duration-[1000ms] ease-out"
-                  style={{
-                    width: '90%',
-                    transitionDuration: `${Math.max(2, Math.ceil(problem.test_cases.length * 1.0))}s`
-                  }}
-                ></div>
-              </div>
-
-              <div className="flex justify-between w-full text-xs text-gray-400 mb-6 font-mono">
-                <span>0%</span>
-                <span className="animate-pulse">Processing...</span>
-                <span>~{Math.ceil(problem.test_cases.length * 1.5)}s</span>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md font-medium">
-                <Lock className="w-3 h-3" />
-                Secure Execution Environment
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Removed Professional Loading Overlay */}
 
         {/* Right Panel - Code Editor */}
         <div className="w-1/2 flex flex-col bg-white relative">
