@@ -52,7 +52,7 @@ const Home = () => {
       color: "purple",
       free: 20,
       prime: 80,
-      route: "/frontend",
+      route: "/frontend/projects",
     },
     {
       icon: Server,

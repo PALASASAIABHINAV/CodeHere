@@ -9,6 +9,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import profilePictureRoutes from './routes/profilePictureRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import leaderboardRoutes from './routes/leaderboardRoutes.js'; // NEW
+import frontendProjectRoutes from './routes/frontendProjectRoutes.js'; // NEW
 import pool from './config/db.js';
 
 dotenv.config();
@@ -35,7 +36,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/profile', profilePictureRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/leaderboard', leaderboardRoutes); // NEW
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/frontend-projects', frontendProjectRoutes); // NEW
 
 // Health check route
 app.get('/api/health', (req, res) => {

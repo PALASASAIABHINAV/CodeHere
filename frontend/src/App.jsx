@@ -13,6 +13,8 @@ import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/AdminDashboard";
 import Leaderboard from "./pages/Leaderboard";
 import AboutUs from "./pages/AboutUs"; // NEW
+import FrontendProjects from "./pages/FrontendProjects"; // NEW
+import WebDevWorkspace from "./pages/WebDevWorkspace"; // NEW
 import ProfilePictureGuard from "./components/ProfilePictureGuard";
 import { useAuthStore } from "./store/authStore";
 
@@ -39,6 +41,8 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/frontend/projects" element={<FrontendProjects />} /> {/* NEW */}
+          <Route path="/frontend/project/:slug" element={<WebDevWorkspace />} /> {/* NEW */}
           <Route path="/about" element={<AboutUs />} /> {/* NEW */}
         </Routes>
       </ProfilePictureGuard>
