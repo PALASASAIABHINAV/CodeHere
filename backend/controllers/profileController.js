@@ -49,6 +49,33 @@ export const getMyProfile = async (req, res) => {
       }
     });
 
+    // --- FRONTEND STATS ---
+    const frontendSolvedByDifficulty = await Profile.getFrontendSolvedByDifficulty(userId);
+
+    // Total Frontend Projects
+    const totalFrontendResult = await pool.query(
+      'SELECT COUNT(*) as total FROM frontend_projects'
+    );
+    const totalFrontend = parseInt(totalFrontendResult.rows[0].total);
+
+    // Frontend Projects by Difficulty
+    const frontendByDifficultyResult = await pool.query(
+      'SELECT difficulty, COUNT(*) as count FROM frontend_projects GROUP BY difficulty'
+    );
+
+    const frontendCounts = {
+      Easy: 0,
+      Medium: 0,
+      Hard: 0
+    };
+
+    frontendByDifficultyResult.rows.forEach(row => {
+      const diff = row.difficulty.charAt(0).toUpperCase() + row.difficulty.slice(1);
+      if (frontendCounts[diff] !== undefined) {
+        frontendCounts[diff] = parseInt(row.count);
+      }
+    });
+
     res.status(200).json({
       success: true,
       profile: {
@@ -61,6 +88,10 @@ export const getMyProfile = async (req, res) => {
         submission_activity: submissionActivity,
         total_problems: totalProblems,
         total_problems_by_difficulty: problemCounts,
+        // Frontend Stats
+        frontend_solved_by_difficulty: frontendSolvedByDifficulty,
+        total_frontend_projects: totalFrontend,
+        total_frontend_by_difficulty: frontendCounts
       },
     });
   } catch (err) {

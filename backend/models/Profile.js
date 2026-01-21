@@ -121,18 +121,65 @@ class Profile {
 
     static async getHeatmapData(userId) {
         try {
+            // Weights: DSA (1), Frontend (5)
+            // Only count 'Accepted' for DSA and 'completed' for Frontend
             const query = `
-        SELECT 
-          DATE(submitted_at) as date,
-          COUNT(*)::int as count
-        FROM user_submissions
-        WHERE user_id = $1 AND status = 'Accepted'
-        GROUP BY DATE(submitted_at)
-        ORDER BY date DESC
-        LIMIT 365
-      `;
+                SELECT 
+                    date,
+                    SUM(weight)::int as count
+                FROM (
+                    -- DSA Submissions (Weight: 1)
+                    SELECT 
+                        DATE(submitted_at) as date,
+                        1 as weight
+                    FROM user_submissions
+                    WHERE user_id = $1 AND status = 'Accepted'
+                    
+                    UNION ALL
+                    
+                    -- Frontend Submissions (Weight: 5)
+                    SELECT 
+                        DATE(created_at) as date,
+                        5 as weight
+                    FROM frontend_submissions
+                    WHERE user_id = $1 AND status = 'completed'
+                ) as unified_activity
+                GROUP BY date
+                ORDER BY date DESC
+                LIMIT 365
+            `;
             const result = await pool.query(query, [userId]);
             return result.rows;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    // Get Frontend solved by difficulty
+    static async getFrontendSolvedByDifficulty(userId) {
+        try {
+            const query = `
+                SELECT 
+                  fp.difficulty,
+                  COUNT(*) as count
+                FROM frontend_submissions fs
+                JOIN frontend_projects fp ON fs.project_id = fp.id
+                WHERE fs.user_id = $1 AND fs.status = 'completed'
+                GROUP BY fp.difficulty
+            `;
+            const result = await pool.query(query, [userId]);
+
+            const difficulties = { Easy: 0, Medium: 0, Hard: 0 };
+            result.rows.forEach(row => {
+                // Determine difficulty string handling (case sensitive?)
+                // Assuming stored as 'Easy', 'Medium', 'Hard' or 'easy', 'medium', 'hard'
+                const diff = row.difficulty.charAt(0).toUpperCase() + row.difficulty.slice(1);
+                if (difficulties[diff] !== undefined) {
+                    difficulties[diff] = parseInt(row.count);
+                }
+            });
+
+            return difficulties;
         } catch (error) {
             throw error;
         }
@@ -141,17 +188,37 @@ class Profile {
     // Get submission activity (Accepted vs Failed) for graph
     static async getSubmissionActivity(userId) {
         try {
+            // For the activity graph, we'll count counts, not weights, to keep the bar chart understandable
+            // DSA Accepted + Frontend Completed = "Accepted"
+            // DSA !!= Accepted = "Failed" (Frontend doesn't really have a "Failed" state stored per se, typically just incomplete)
             const query = `
-        SELECT 
-          DATE(submitted_at) as date,
-          COUNT(CASE WHEN status = 'Accepted' THEN 1 END)::int as accepted,
-          COUNT(CASE WHEN status != 'Accepted' THEN 1 END)::int as failed
-        FROM user_submissions
-        WHERE user_id = $1
-        GROUP BY DATE(submitted_at)
-        ORDER BY date ASC
-        LIMIT 30
-      `;
+                SELECT 
+                    date,
+                    SUM(accepted)::int as accepted,
+                    SUM(failed)::int as failed
+                FROM (
+                    -- DSA
+                    SELECT 
+                        DATE(submitted_at) as date,
+                        CASE WHEN status = 'Accepted' THEN 1 ELSE 0 END as accepted,
+                        CASE WHEN status != 'Accepted' THEN 1 ELSE 0 END as failed
+                    FROM user_submissions
+                    WHERE user_id = $1
+                    
+                    UNION ALL
+                    
+                    -- Frontend (Only completed counts as accepted)
+                    SELECT 
+                        DATE(created_at) as date,
+                        1 as accepted,
+                        0 as failed
+                    FROM frontend_submissions
+                    WHERE user_id = $1 AND status = 'completed'
+                ) as unified_stats
+                GROUP BY date
+                ORDER BY date ASC
+                LIMIT 30
+            `;
             const result = await pool.query(query, [userId]);
             return result.rows;
         } catch (error) {

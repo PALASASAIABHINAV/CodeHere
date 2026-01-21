@@ -215,12 +215,17 @@ const AdminDashboard = () => {
                     })()}
                   </div>
                 </div>
+                {/* Stats Updated */}
                 <div>
                   <p className="text-sm text-gray-500">Problems Solved</p>
                   <p className="text-lg font-bold text-green-600">{selectedUser.problems_solved || 0}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Total Submissions</p>
+                  <p className="text-sm text-gray-500">Frontend Projects Completed</p>
+                  <p className="text-lg font-bold text-purple-600">{selectedUser.projects_completed || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total Activity</p>
                   <p className="text-lg font-bold text-blue-600">{selectedUser.total_submissions || 0}</p>
                 </div>
               </div>
@@ -228,21 +233,23 @@ const AdminDashboard = () => {
               {selectedUser.recent_submissions && selectedUser.recent_submissions.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <Code className="h-5 w-5 text-gray-500" /> Recent Submissions
+                    <Code className="h-5 w-5 text-gray-500" /> Recent Activity
                   </h3>
                   <div className="space-y-3">
                     {selectedUser.recent_submissions.slice(0, 5).map((sub, idx) => (
                       <div key={idx} className="p-4 bg-white border border-gray-200 rounded-lg flex items-center justify-between hover:shadow-sm transition">
                         <div>
-                          <p className="font-medium text-gray-900">{sub.problem_title}</p>
+                          <p className="font-medium text-gray-900">{sub.title}</p>
                           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs uppercase font-semibold">{sub.language}</span>
-                            <span>{new Date(sub.submitted_at).toLocaleDateString()}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs uppercase font-semibold ${sub.type === 'Frontend' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100'}`}>
+                              {sub.type === 'Frontend' ? 'Project' : sub.language}
+                            </span>
+                            <span>{new Date(sub.date).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${sub.status === 'Accepted' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${(sub.status === 'Accepted' || sub.status === 'completed') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                          {sub.status}
+                          {sub.status === 'completed' ? 'Completed' : sub.status}
                         </span>
                       </div>
                     ))}
@@ -369,72 +376,6 @@ const AdminDashboard = () => {
               </div>
 
               <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Problem Difficulty</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RePieChart>
-                    <Pie
-                      data={analyticsData.problemStats}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ difficulty, count }) => `${difficulty}: ${count}`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="count"
-                    >
-                      {analyticsData.problemStats.map((entry, index) => {
-                        const difficultyKey = entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1).toLowerCase();
-                        return <Cell key={`cell-${index}`} fill={COLORS[difficultyKey] || '#8884d8'} />;
-                      })}
-                    </Pie>
-                    <Tooltip />
-                  </RePieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Language Popularity</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.languageStats} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="language" type="category" width={80} />
-                    <Tooltip />
-                    <Bar dataKey="total_submissions" fill={COLORS.primary} name="Submissions" />
-                    <Bar dataKey="accepted" fill={COLORS.success} name="Accepted" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Hourly Activity</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.hourlyActivity}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="hour" label={{ value: 'Hour', position: 'insideBottom', offset: -5 }} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill={COLORS.purple} name="Submissions" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* User Growth */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 col-span-1 lg:col-span-2">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">User Growth Over Time</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={analyticsData.userGrowth}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="total_users" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Status Distribution */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Outcomes</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <RePieChart>
@@ -456,23 +397,22 @@ const AdminDashboard = () => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Tag Popularity */}
               <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular Topics</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Hourly Activity</h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analyticsData.tagPopularity} layout="vertical">
+                  <BarChart data={analyticsData.hourlyActivity}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="tag" type="category" width={100} tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="hour" label={{ value: 'Hour', position: 'insideBottom', offset: -5 }} />
+                    <YAxis />
                     <Tooltip />
-                    <Bar dataKey="count" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="count" fill={COLORS.purple} name="Submissions" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
-              {/* Top Performers Leaderboard */}
+              {/* Top Performers Leaderboard (Updated) */}
               <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
                 <div className="p-6 border-b border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900">🏆 Top Performers</h3>
@@ -483,8 +423,8 @@ const AdminDashboard = () => {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solved</th>
-                        {/* Removed Streak Column */}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DSA Solved</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Frontend Projects</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                       </tr>
                     </thead>
@@ -515,7 +455,8 @@ const AdminDashboard = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 font-semibold text-green-600">{performer.problems_solved}</td>
+                          <td className="px-6 py-4 font-semibold text-green-600">{performer.problems_solved || 0}</td>
+                          <td className="px-6 py-4 font-semibold text-purple-600">{performer.projects_completed || 0}</td>
                           <td className="px-6 py-4">
                             <button onClick={() => viewUserProfile(performer.id)} className="text-blue-600 hover:underline text-sm font-medium">
                               View Profile
@@ -533,104 +474,174 @@ const AdminDashboard = () => {
 
         {/* Users Management Content */}
         {!loading && activeTab === 'users' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Registered Users ({users.length})</h3>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                />
-              </div>
+          <div className="space-y-6">
+            {/* User Growth Chart - MOVED HERE */}
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">User Growth Over Time</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={analyticsData.userGrowth}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
+                  <YAxis />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="total_users" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.1} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {u.profile_picture_url ? (
-                            <img src={u.profile_picture_url} alt={u.name} className="h-8 w-8 rounded-full object-cover" />
-                          ) : (
-                            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs">{u.name.substring(0, 2).toUpperCase()}</div>
-                          )}
-                          <div className="font-medium text-gray-900">{u.name}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleTogglePrime(u.id, u.is_prime)}
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition ${u.is_prime
-                            ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                            }`}
-                        >
-                          {u.is_prime ? <><Crown className="h-3 w-3" /> Prime</> : 'Free'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggleRole(u.id, u.role)}
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition ${u.role === 'admin'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
-                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                            }`}
-                        >
-                          {u.role === 'admin' ? <><Shield className="h-3 w-3" /> Admin</> : 'User'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => viewUserProfile(u.id)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            title="View Analytics"
-                          >
-                            <BarChart3 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(u.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                            title="Delete User"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredUsers.length === 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">Registered Users ({users.length})</h3>
+                <div className="relative w-full md:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                        No users found matching "{userSearch}"
-                      </td>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-gray-50 transition">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {u.profile_picture_url ? (
+                              <img src={u.profile_picture_url} alt={u.name} className="h-8 w-8 rounded-full object-cover" />
+                            ) : (
+                              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs">{u.name.substring(0, 2).toUpperCase()}</div>
+                            )}
+                            <div className="font-medium text-gray-900">{u.name}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{u.email}</td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleTogglePrime(u.id, u.is_prime)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition ${u.is_prime
+                              ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                              }`}
+                          >
+                            {u.is_prime ? <><Crown className="h-3 w-3" /> Prime</> : 'Free'}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleToggleRole(u.id, u.role)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition ${u.role === 'admin'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                              }`}
+                          >
+                            {u.role === 'admin' ? <><Shield className="h-3 w-3" /> Admin</> : 'User'}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => viewUserProfile(u.id)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="View Analytics"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="Delete User"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                          No users found matching "{userSearch}"
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
         {/* Problem Management Content */}
         {!loading && activeTab === 'problems' && (
-          <AdminProblemManager />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Problem Difficulty</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <RePieChart>
+                    <Pie
+                      data={analyticsData.problemStats}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ difficulty, count }) => `${difficulty}: ${count}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {analyticsData.problemStats.map((entry, index) => {
+                        const difficultyKey = entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1).toLowerCase();
+                        return <Cell key={`cell-${index}`} fill={COLORS[difficultyKey] || '#8884d8'} />;
+                      })}
+                    </Pie>
+                    <Tooltip />
+                  </RePieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Language Usage</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={analyticsData.languageStats} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="language" type="category" width={80} tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Bar dataKey="total_submissions" fill={COLORS.primary} name="Submissions" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular Topics</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={analyticsData.tagPopularity} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="tag" type="category" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <AdminProblemManager />
+          </div>
         )}
 
         {/* Frontend Projects Management Content */}

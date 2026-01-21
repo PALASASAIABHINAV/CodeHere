@@ -234,7 +234,7 @@ const Profile = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center gap-3 mb-2">
               <Code className="h-6 w-6 text-green-600" />
-              <h3 className="text-sm font-medium text-gray-600">Problems Solved</h3>
+              <h3 className="text-sm font-medium text-gray-600">DSA Problems Solved</h3>
             </div>
             <p className="text-3xl font-bold text-gray-900">{profile.solved_count || 0}</p>
           </div>
@@ -306,17 +306,25 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Problems Solved Section - Compact with Activity Graph */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 border border-gray-200">
+        {/* --- ACTIVITY GRAPH SECTION (Moved to full width) --- */}
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8 border border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-gray-700">Problems Solved</h2>
-            {/* Optional: Add time range selector here if needed later */}
+            <h2 className="text-lg font-bold text-gray-700">Submission Activity</h2>
           </div>
+          <div className="h-[300px] w-full">
+            <ActivityGraph data={profile.submission_activity} />
+          </div>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Circular Progress - Left Side */}
-            <div className="lg:col-span-1">
+        {/* --- SKILLS INTELLIGENCE SECTION (Side-by-Side) --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+          {/* 1. DSA Analysis Card */}
+          <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 h-full">
+            <h2 className="text-lg font-bold text-gray-700 mb-6">DSA Analysis</h2>
+            <div className="flex justify-center">
               <CircularProgress
+                label="Solved"
                 solved={profile.solved_count || 0}
                 total={profile.total_problems || 0}
                 easy={profile.easy_count || 0}
@@ -328,13 +336,39 @@ const Profile = () => {
                 totalHard={profile.total_problems_by_difficulty?.Hard || 0}
               />
             </div>
+          </div>
 
-            {/* Activity Graph - Right Side */}
-            <div className="lg:col-span-2">
-              <ActivityGraph data={profile.submission_activity} />
+          {/* 2. Frontend Analysis Card */}
+          <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 h-full">
+            <h2 className="text-lg font-bold text-gray-700 mb-6">Frontend Analysis</h2>
+            <div className="flex justify-center">
+              <CircularProgress
+                label="Completed"
+                solved={
+                  (profile.frontend_solved_by_difficulty?.Easy || 0) +
+                  (profile.frontend_solved_by_difficulty?.Medium || 0) +
+                  (profile.frontend_solved_by_difficulty?.Hard || 0)
+                }
+                total={profile.total_frontend_projects || 0}
+                easy={profile.frontend_solved_by_difficulty?.Easy || 0}
+                medium={profile.frontend_solved_by_difficulty?.Medium || 0}
+                hard={profile.frontend_solved_by_difficulty?.Hard || 0}
+                totalEasy={profile.total_frontend_by_difficulty?.Easy || 0}
+                totalMedium={profile.total_frontend_by_difficulty?.Medium || 0}
+                totalHard={profile.total_frontend_by_difficulty?.Hard || 0}
+                // Frontend generally doesn't track "attempted" in the same way, or use if available
+                attempted={0}
+              />
             </div>
           </div>
+
         </div>
+
+        {profile.frontend_solved_by_difficulty && (
+          <div className="mb-6">
+            {/* Debug or extra info if needed, otherwise clean look is better */}
+          </div>
+        )}
 
         <ActivityHeatmap heatmapData={heatmap} />
 
