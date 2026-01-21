@@ -1,4 +1,4 @@
-// components/ActivityHeatmap.jsx - Enhanced version with stats
+// components/ActivityHeatmap.jsx - Enhanced version with strict month separation
 import React, { useState, useMemo } from "react";
 
 const ActivityHeatmap = ({ heatmapData = [] }) => {
@@ -14,99 +14,6 @@ const ActivityHeatmap = ({ heatmapData = [] }) => {
     return heatmapData.filter((h) => h.date.startsWith(String(selectedYear)));
   }, [heatmapData, selectedYear]);
 
-  // Build all days for the year
-  const yearDays = useMemo(() => {
-    const start = new Date(selectedYear, 0, 1);
-    const end = new Date(selectedYear, 11, 31);
-
-    // Offset so first column starts on Monday
-    const weekday = start.getDay(); // Sun = 0
-    const offset = weekday === 0 ? 6 : weekday - 1;
-    start.setDate(start.getDate() - offset);
-
-    const result = [];
-    let current = new Date(start);
-
-    // Extend grid until it completes the final week
-    while (current <= end || current.getDay() !== 1) {
-      const iso = current.toISOString().split("T")[0];
-      const found = yearData.find((h) => h.date.startsWith(iso));
-
-      result.push({
-        date: new Date(current),
-        count: found ? found.count : 0,
-      });
-
-      current.setDate(current.getDate() + 1);
-    }
-
-    return result;
-  }, [selectedYear, yearData]);
-
-  // Build days for a specific month
-  const monthDays = useMemo(() => {
-    const start = new Date(selectedYear, selectedMonth, 1);
-    const end = new Date(selectedYear, selectedMonth + 1, 0);
-
-    // Offset so first column starts on Monday
-    const weekday = start.getDay();
-    const offset = weekday === 0 ? 6 : weekday - 1;
-    start.setDate(start.getDate() - offset);
-
-    const result = [];
-    let current = new Date(start);
-
-    // Extend until the end of the month's last week
-    while (current <= end || current.getDay() !== 1) {
-      const iso = current.toISOString().split("T")[0];
-      const found = yearData.find((h) => h.date.startsWith(iso));
-
-      result.push({
-        date: new Date(current),
-        count: found ? found.count : 0,
-      });
-
-      current.setDate(current.getDate() + 1);
-    }
-
-    return result;
-  }, [selectedYear, selectedMonth, yearData]);
-
-  // Group year days into weeks by month (for spacing)
-  const monthGroups = useMemo(() => {
-    const groups = [];
-    let currentMonthWeeks = [];
-    let lastMonth = null;
-
-    for (let i = 0; i < yearDays.length; i += 7) {
-      const week = yearDays.slice(i, i + 7);
-      const weekMonth = week[0].date.getMonth();
-
-      if (lastMonth !== null && weekMonth !== lastMonth) {
-        groups.push({ month: lastMonth, weeks: currentMonthWeeks });
-        currentMonthWeeks = [];
-      }
-
-      currentMonthWeeks.push(week);
-      lastMonth = weekMonth;
-    }
-
-    if (currentMonthWeeks.length > 0) {
-      groups.push({ month: lastMonth, weeks: currentMonthWeeks });
-    }
-
-    return groups;
-  }, [yearDays]);
-
-  // Group month days into weeks
-  const monthWeeks = useMemo(() => {
-    const weeks = [];
-    for (let i = 0; i < monthDays.length; i += 7) {
-      weeks.push(monthDays.slice(i, i + 7));
-    }
-    return weeks;
-  }, [monthDays]);
-
   // Colors exactly like GitHub
   const getColor = (count) => {
     if (count === 0) return "bg-[#ebedf0]";
@@ -117,123 +24,196 @@ const ActivityHeatmap = ({ heatmapData = [] }) => {
   };
 
   const totalSubmissions = yearData.reduce((sum, h) => sum + h.count, 0);
-  const totalActiveDays = yearData.filter(h => h.count > 0).length;
+  const totalActiveDays = yearData.filter((h) => h.count > 0).length;
 
   // Calculate max streak and current streak
-  const calculateStreaks = () => {
+  const { maxStreak, currentStreakCount } = useMemo(() => {
     const sortedDates = yearData
-      .filter(h => h.count > 0)
-      .map(h => new Date(h.date))
+      .filter((h) => h.count > 0)
+      .map((h) => new Date(h.date))
       .sort((a, b) => a - b);
 
-    let maxStreak = 0;
-    let tempStreak = 1;
+    let max = 0;
+    let temp = 1;
 
     for (let i = 0; i < sortedDates.length; i++) {
       if (i > 0) {
-        const dayDiff = Math.floor((sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24));
+        const dayDiff = Math.floor(
+          (sortedDates[i] - sortedDates[i - 1]) / (1000 * 60 * 60 * 24)
+        );
 
         if (dayDiff === 1) {
-          tempStreak++;
+          temp++;
         } else {
-          maxStreak = Math.max(maxStreak, tempStreak);
-          tempStreak = 1;
+          max = Math.max(max, temp);
+          temp = 1;
         }
       }
     }
-    maxStreak = Math.max(maxStreak, tempStreak);
+    max = Math.max(max, temp);
 
     // Calculate current streak (from today backwards)
-    let currentStreakCount = 0;
+    let current = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     let checkDate = new Date(today);
 
     for (let i = 0; i < 365; i++) {
-      const isoDate = checkDate.toISOString().split('T')[0];
-      const found = yearData.find(h => h.date.startsWith(isoDate) && h.count > 0);
+      const isoDate = checkDate.toISOString().split("T")[0];
+      const found = yearData.find(
+        (h) => h.date.startsWith(isoDate) && h.count > 0
+      );
 
       if (found) {
-        currentStreakCount++;
+        current++;
         checkDate.setDate(checkDate.getDate() - 1);
-      } else if (currentStreakCount > 0) {
+      } else if (current > 0) {
         break;
       } else {
         checkDate.setDate(checkDate.getDate() - 1);
       }
     }
 
-    return { maxStreak, currentStreakCount };
+    return { maxStreak: max, currentStreakCount: current };
+  }, [yearData]);
+
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  // --- STRICT MONTH SEPARATION LOGIC ---
+
+  // Helper: Get all weeks for a specific month (padded to start on Monday)
+  const getMonthWeeks = (year, month) => {
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0); // Last day of month
+
+    // Adjust start to previous Monday
+    const startDay = start.getDay(); // Sun=0
+    const offset = startDay === 0 ? 6 : startDay - 1;
+    const gridStart = new Date(start);
+    gridStart.setDate(gridStart.getDate() - offset);
+
+    // Generate days until we cover the end date + finish that week
+    const weeks = [];
+    let currentWeek = [];
+    let current = new Date(gridStart);
+
+    // Loop until we pass the end AND finish the current week (Monday check)
+    while (current <= end || current.getDay() !== 1) {
+      const isCurrentMonth = current.getMonth() === month;
+      const iso = current.toISOString().split("T")[0];
+      const found = yearData.find((h) => h.date.startsWith(iso));
+
+      currentWeek.push({
+        date: new Date(current),
+        count: found ? found.count : 0,
+        isCurrentMonth, // Key flag for visibility
+      });
+
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return weeks;
   };
 
-  const { maxStreak, currentStreakCount } = calculateStreaks();
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  // Generate data for all 12 months
+  const allMonthsData = useMemo(() => {
+    return monthNames.map((_, index) => ({
+      monthIndex: index,
+      name: monthNames[index],
+      weeks: getMonthWeeks(selectedYear, index),
+    }));
+  }, [selectedYear, yearData]);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-6 shadow-sm">
-
       {/* Header with stats */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-8">
-          <h2 className="text-sm text-gray-600">
-            <span className="text-xl font-black text-gray-900">{totalSubmissions}</span> submissions in the past one year
+      <div className="flex flex-wrap items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8">
+          <h2 className="text-sm text-gray-600 whitespace-nowrap">
+            <span className="text-xl font-black text-gray-900">
+              {totalSubmissions}
+            </span>{" "}
+            submissions in {selectedYear}
           </h2>
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm">
             <div className="text-gray-600">
-              Total active days: <span className="font-bold text-gray-900">{totalActiveDays}</span>
+              Total active days:{" "}
+              <span className="font-bold text-gray-900">{totalActiveDays}</span>
             </div>
             <div className="text-gray-600">
-              Max streak: <span className="font-bold text-gray-900">{maxStreak}</span>
+              Max streak:{" "}
+              <span className="font-bold text-gray-900">{maxStreak}</span>
             </div>
             <div className="text-gray-600">
-              Current: <span className="font-bold text-gray-900">{currentStreakCount}</span>
+              Current:{" "}
+              <span className="font-bold text-gray-900">
+                {currentStreakCount}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Year/Month Tabs */}
-        <div className="flex items-center gap-1 border rounded-md overflow-hidden">
-          <button
-            onClick={() => setViewMode("year")}
-            className={`px-4 py-1 text-sm font-medium ${viewMode === "year"
-              ? "bg-gray-100 text-gray-700"
-              : "text-gray-600 hover:bg-gray-50"
-              }`}
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="border border-gray-300 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            Year
-          </button>
-          <button
-            onClick={() => setViewMode("month")}
-            className={`px-4 py-1 text-sm font-medium ${viewMode === "month"
-              ? "bg-gray-100 text-gray-700"
-              : "text-gray-600 hover:bg-gray-50"
-              }`}
-          >
-            Month
-          </button>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center p-1 bg-gray-100 rounded-lg border border-gray-200">
+            <button
+              onClick={() => setViewMode("year")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === "year"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                }`}
+            >
+              Year
+            </button>
+            <button
+              onClick={() => setViewMode("month")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === "month"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                }`}
+            >
+              Month
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Year Selector Dropdown */}
-      <div className="mb-4 flex gap-3">
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="border px-3 py-1.5 rounded-md text-sm"
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
-
-        {/* Month selector (only shown in month view) */}
-        {viewMode === "month" && (
+      {viewMode === "month" && (
+        <div className="mb-6">
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="border px-3 py-1.5 rounded-md text-sm"
+            className="border border-gray-300 px-3 py-1.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
             {monthNames.map((name, idx) => (
               <option key={idx} value={idx}>
@@ -241,105 +221,105 @@ const ActivityHeatmap = ({ heatmapData = [] }) => {
               </option>
             ))}
           </select>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Heatmap */}
-      <div className="overflow-x-auto">
-
+      {/* Heatmap Container */}
+      <div className="w-full overflow-x-auto pb-2">
         {viewMode === "year" ? (
-          // YEAR VIEW - with month spacing
-          <>
-            {/* Month labels */}
-            <div className="flex ml-10 mb-2 gap-3">
-              {monthGroups.map((group, idx) => (
-                <div
-                  key={idx}
-                  style={{ width: `${group.weeks.length * 16}px` }}
-                  className="text-xs text-gray-500"
-                >
-                  {monthNames[group.month]}
+          // --- YEAR VIEW ---
+          <div className="flex gap-4 min-w-max">
+            {/* Day Labels (Mon/Wed/Fri) */}
+            <div className="flex flex-col justify-between text-[10px] text-gray-400 font-medium py-[18px] h-[106px] sticky left-0 bg-white z-10">
+              <span>Mon</span>
+              <span>Wed</span>
+              <span>Fri</span>
+            </div>
+
+            {/* Months Row */}
+            {allMonthsData.map((month) => (
+              <div key={month.name} className="flex flex-col gap-2">
+                {/* Month Name */}
+                <span className="text-xs font-medium text-gray-500 pl-0.5">
+                  {month.name}
+                </span>
+
+                {/* Weeks Grid */}
+                <div className="flex gap-[3px]">
+                  {month.weeks.map((week, wIdx) => (
+                    <div key={wIdx} className="flex flex-col gap-[3px]">
+                      {week.map((day, dIdx) => (
+                        <div
+                          key={dIdx}
+                          title={
+                            day.isCurrentMonth
+                              ? `${day.count} submissions on ${day.date.toDateString()}`
+                              : ""
+                          }
+                          className={`w-[11px] h-[11px] rounded-[2px] transition-colors ${day.isCurrentMonth
+                              ? getColor(day.count)
+                              : "bg-transparent" // INVISIBLE if not in current month
+                            }`}
+                        />
+                      ))}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {/* Grid with month separators */}
-            <div className="flex">
-              {/* Day labels */}
-              <div className="flex flex-col justify-between text-xs text-gray-500 mr-2 py-1 h-[90px]">
-                <span>Mon</span>
-                <span>Wed</span>
-                <span>Fri</span>
               </div>
-
-              {/* Month groups with spacing */}
-              <div className="flex gap-3">
-                {monthGroups.map((group, groupIdx) => (
-                  <div key={groupIdx} className="flex gap-[3px]">
-                    {group.weeks.map((week, weekIdx) => (
-                      <div key={weekIdx} className="flex flex-col gap-[3px]">
-                        {week.map((day, dayIdx) => (
-                          <div
-                            key={dayIdx}
-                            title={`${day.count} submissions • ${day.date.toDateString()}`}
-                            className={`w-[13px] h-[13px] rounded-sm ${getColor(day.count)}`}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
+            ))}
+          </div>
         ) : (
-          // MONTH VIEW
-          <>
-            <div className="flex ml-10 mb-2">
-              <div className="text-xs text-gray-500">
-                {monthNames[selectedMonth]}
-              </div>
+          // --- MONTH VIEW ---
+          <div className="flex gap-4">
+            <div className="flex flex-col justify-between text-[10px] text-gray-400 font-medium py-[18px] h-[106px]">
+              <span>Mon</span>
+              <span>Wed</span>
+              <span>Fri</span>
             </div>
 
-            <div className="flex">
-              {/* Day labels */}
-              <div className="flex flex-col justify-between text-xs text-gray-500 mr-2 py-1 h-[90px]">
-                <span>Mon</span>
-                <span>Wed</span>
-                <span>Fri</span>
-              </div>
-
-              {/* Weeks */}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-gray-500 pl-0.5">
+                {monthNames[selectedMonth]}
+              </span>
               <div className="flex gap-[3px]">
-                {monthWeeks.map((week, wi) => (
-                  <div key={wi} className="flex flex-col gap-[3px]">
-                    {week.map((day, di) => (
+                {allMonthsData[selectedMonth].weeks.map((week, wIdx) => (
+                  <div key={wIdx} className="flex flex-col gap-[3px]">
+                    {week.map((day, dIdx) => (
                       <div
-                        key={di}
-                        title={`${day.count} submissions • ${day.date.toDateString()}`}
-                        className={`w-[13px] h-[13px] rounded-sm ${getColor(day.count)}`}
+                        key={dIdx}
+                        title={
+                          day.isCurrentMonth
+                            ? `${day.count} submissions on ${day.date.toDateString()}`
+                            : ""
+                        }
+                        className={`w-[11px] h-[11px] rounded-[2px] transition-colors ${
+                          // In single month view, we might choose to show all or still strict.
+                          // Strict adds clarity even here.
+                          day.isCurrentMonth
+                            ? getColor(day.count)
+                            : "bg-gray-50 opacity-30" // Faint for non-month days in single view? Or transparent? Let's go transparent for consistency
+                          }`}
                       />
                     ))}
                   </div>
                 ))}
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {/* Legend */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 mt-4">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-6 md:ml-8">
           <span>Less</span>
           <div className="flex gap-1">
-            <div className="w-3 h-3 bg-[#ebedf0] rounded" />
-            <div className="w-3 h-3 bg-[#9be9a8] rounded" />
-            <div className="w-3 h-3 bg-[#40c463] rounded" />
-            <div className="w-3 h-3 bg-[#30a14e] rounded" />
-            <div className="w-3 h-3 bg-[#216e39] rounded" />
+            <div className="w-[11px] h-[11px] bg-[#ebedf0] rounded-[2px]" />
+            <div className="w-[11px] h-[11px] bg-[#9be9a8] rounded-[2px]" />
+            <div className="w-[11px] h-[11px] bg-[#40c463] rounded-[2px]" />
+            <div className="w-[11px] h-[11px] bg-[#30a14e] rounded-[2px]" />
+            <div className="w-[11px] h-[11px] bg-[#216e39] rounded-[2px]" />
           </div>
           <span>More</span>
         </div>
-
       </div>
     </div>
   );
