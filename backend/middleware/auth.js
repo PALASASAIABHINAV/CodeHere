@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 
+
+
 // Middleware to verify JWT token from cookie
 export const verifyToken = (req, res, next) => {
   try {
