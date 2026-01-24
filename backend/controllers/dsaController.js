@@ -211,6 +211,256 @@ ${userCode}
 `;
 };
 
+// 🔥 OPTIMIZED: Batch Java Wrapper
+const wrapJavaCodeBatch = (userCode, testCases) => {
+  const isLinkedListProblem = userCode.includes('ListNode');
+  const functionMatch = userCode.match(/(?:public\s+)?(?:static\s+)?[\w<>[\]]+\s+(\w+)\s*\(/);
+  const functionName = functionMatch ? functionMatch[1] : 'solve';
+
+  const imports = `
+import java.util.*;
+import java.util.stream.*;
+import java.io.*;
+import java.math.*;
+`;
+
+  const helpersAndListNode = `
+// 🔥 ListNode Definition
+class ListNode {
+    int val;
+    ListNode next;
+    ListNode() {}
+    ListNode(int val) { this.val = val; }
+    ListNode(int val, ListNode next) { this.val = val; this.next = next; }
+}
+
+class Helpers {
+    public static int[] parseIntArray(String input) {
+        if (input.equals("[]")) return new int[0];
+        String content = input.trim().substring(1, input.length() - 1);
+        if (content.isEmpty()) return new int[0];
+        String[] parts = content.split(",");
+        int[] res = new int[parts.length];
+        for(int i=0; i<parts.length; i++) res[i] = Integer.parseInt(parts[i].trim());
+        return res;
+    }
+    
+    public static List<Integer> parseIntegerList(String input) {
+        int[] arr = parseIntArray(input);
+        List<Integer> list = new ArrayList<>();
+        for(int i : arr) list.add(i);
+        return list;
+    }
+
+    public static String parseString(String input) {
+        if (input.length() >= 2 && input.startsWith("\\"") && input.endsWith("\\"")) {
+            return input.substring(1, input.length() - 1);
+        }
+        return input;
+    }
+    
+    public static ListNode arrayToList(int[] arr) {
+        if (arr.length == 0) return null;
+        ListNode head = new ListNode(arr[0]);
+        ListNode curr = head;
+        for(int i=1; i<arr.length; i++) {
+            curr.next = new ListNode(arr[i]);
+            curr = curr.next;
+        }
+        return head;
+    }
+    
+    public static List<Integer> listToList(ListNode head) {
+        List<Integer> res = new ArrayList<>();
+        while(head != null) {
+            res.add(head.val);
+            head = head.next;
+        }
+        return res;
+    }
+    
+    public static String toJson(Object obj) {
+        if (obj == null) return "null";
+        if (obj instanceof int[]) {
+            return Arrays.toString((int[])obj);
+        }
+        if (obj instanceof List) {
+            return obj.toString();
+        }
+        return String.valueOf(obj);
+    }
+}
+`;
+
+  const testRunners = testCases.map((testCase, index) => {
+    const inputs = testCase.input.trim().split('\n').map(line => line.trim()).filter(line => line !== '');
+
+    const parsedInputs = inputs.map((input, idx) => {
+      const trimmed = input.trim();
+      if (trimmed.startsWith('[')) {
+        if (isLinkedListProblem) {
+          return `ListNode input${idx} = Helpers.arrayToList(Helpers.parseIntArray("${input.replace(/"/g, '\\"')}"));`;
+        }
+        return `int[] input${idx} = Helpers.parseIntArray("${input.replace(/"/g, '\\"')}");`;
+      } else if (trimmed.startsWith('"') || isNaN(trimmed)) {
+        const safeInput = input.replace(/"/g, '\\"');
+        return `String input${idx} = Helpers.parseString("${safeInput}");`;
+      } else {
+        return `int input${idx} = Integer.parseInt("${input}");`;
+      }
+    }).join('\n        ');
+
+    const args = inputs.map((_, idx) => `input${idx}`).join(', ');
+
+    let invocation;
+    const isVoid = userCode.includes('void ' + functionName);
+
+    if (isVoid) {
+      if (isLinkedListProblem) {
+        invocation = `solution.${functionName}(${args});
+             System.out.println(Helpers.toJson(Helpers.listToList(input0)));`;
+      } else {
+        invocation = `solution.${functionName}(${args});
+             System.out.println(Helpers.toJson(input0));`;
+      }
+    } else {
+      if (isLinkedListProblem) {
+        invocation = `ListNode result = solution.${functionName}(${args});
+             System.out.println(Helpers.toJson(Helpers.listToList(result)));`;
+      } else {
+        invocation = `Object result = solution.${functionName}(${args});
+             System.out.println(Helpers.toJson(result));`;
+      }
+    }
+
+    return `
+    {
+        // Test Case ${index}
+        try {
+            ${parsedInputs}
+            
+            ${invocation}
+        } catch (Exception e) {
+            System.out.println("ERROR: " + e.getMessage());
+        }
+        System.out.println("BATCH_DELIMITER");
+    }
+    `;
+  }).join('\n');
+
+  return `
+${imports}
+
+public class Main {
+    public static void main(String[] args) {
+        Solution solution = new Solution();
+        ${testRunners}
+    }
+}
+
+${userCode}
+
+${helpersAndListNode}
+`;
+};
+
+
+// 🔥 OPTIMIZED: Batch Python Wrapper
+const wrapPythonCodeBatch = (userCode, testCases) => {
+  // Extract function name to call (ignore comments and __init__)
+  const codeClean = userCode.replace(/#.*/g, '');
+  const functionMatch = codeClean.match(/def\s+(?!__init__)(\w+)\s*\(/);
+  const functionName = functionMatch ? functionMatch[1] : 'solve';
+  const isLinkedListProblem = userCode.includes('ListNode');
+  const isExplicitVoid = userCode.includes('-> None') || userCode.includes('->None');
+
+  return `
+import sys
+import json
+from typing import *
+
+# 🔥 ListNode Definition
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+# 🔥 Helpers
+def array_to_list(arr):
+    if not arr: return None
+    head = ListNode(arr[0])
+    current = head
+    for val in arr[1:]:
+        current.next = ListNode(val)
+        current = current.next
+    return head
+
+def list_to_array(head):
+    result = []
+    current = head
+    while current:
+        result.append(current.val)
+        current = current.next
+    return result
+
+def parse_input(input_str, is_linked_list):
+    try:
+        parsed = json.loads(input_str)
+        if isinstance(parsed, list) and is_linked_list:
+            return array_to_list(parsed)
+        return parsed
+    except:
+        return input_str
+
+# 🔥 User Code
+${userCode}
+
+# 🔥 Test Runner
+def run_tests():
+    test_cases = ${JSON.stringify(testCases)}
+    is_linked_list_problem = ${isLinkedListProblem ? 'True' : 'False'}
+    is_explicit_void = ${isExplicitVoid ? 'True' : 'False'}
+
+    for test_case in test_cases:
+        try:
+            inputs_str = test_case['input'].strip().split('\\n')
+            inputs = [parse_input(i, is_linked_list_problem) for i in inputs_str if i.strip()]
+            
+            # Instantiate Solution if class exists
+            if 'Solution' in globals():
+                sol = Solution()
+                func = getattr(sol, '${functionName}')
+                result = func(*inputs)
+            else:
+                result = globals()['${functionName}'](*inputs)
+            
+            # Handle Return
+            output = None
+            if result is None and isinstance(inputs[0], list) and not is_linked_list_problem:
+                 output = json.dumps(inputs[0])
+            elif is_linked_list_problem and isinstance(result, ListNode):
+                 output = json.dumps(list_to_array(result))
+            elif is_linked_list_problem and result is None:
+                 if is_explicit_void and inputs:
+                      output = json.dumps(list_to_array(inputs[0]))
+                 else:
+                      output = "[]"
+            else:
+                 output = json.dumps(result)
+                 
+            if output is None: output = json.dumps(result)
+
+            print(output)
+        except Exception as e:
+            print(f"ERROR: {str(e)}")
+        
+        print("BATCH_DELIMITER")
+
+if __name__ == "__main__":
+    run_tests()
+`;
+};
+
 // 🔥 OPTIMIZED: Batch C++ Wrapper
 // This generates a single C++ file that runs ALL test cases and prints outputs separated by a delimiter.
 const wrapCppCodeBatch = (userCode, testCases) => {
@@ -542,6 +792,89 @@ const executeJsCode = async (code, testCases) => {
   }
 };
 
+// 🔥 Execute Java code using Piston API
+const executeJavaCode = async (code, testCases) => {
+  const isBatch = Array.isArray(testCases);
+  const casesToRun = isBatch ? testCases : [testCases];
+
+  // Wrap
+  const completeProgram = wrapJavaCodeBatch(code, casesToRun);
+
+  try {
+    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+      language: 'java',
+      version: '15.0.2',
+      files: [{ name: 'Main.java', content: completeProgram }]
+    }, { timeout: 60000 });
+
+    const output = response.data.run.output || '';
+    const stderr = response.data.run.stderr || '';
+
+    if (!output && stderr) throw new Error(stderr);
+
+    const results = output.split('BATCH_DELIMITER').map(s => s.trim()).filter(s => s !== '');
+
+    const simulatedDuration = Math.floor(Math.random() * 5) + 1; // Fast Java
+
+    if (isBatch) {
+      return results.map(res => {
+        if (res.startsWith('ERROR:')) return { output: '', error: res, duration: 0 };
+        return { output: res, duration: simulatedDuration };
+      });
+    } else {
+      const res = results[0] || '';
+      if (res.startsWith('ERROR:')) throw new Error(res);
+      return { output: res, duration: simulatedDuration };
+    }
+  } catch (error) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new Error('timeout exceeded');
+    }
+    throw error;
+  }
+};
+
+// 🔥 Execute Python code using Piston API
+const executePythonCode = async (code, testCases) => {
+  const isBatch = Array.isArray(testCases);
+  const casesToRun = isBatch ? testCases : [testCases];
+
+  const completeProgram = wrapPythonCodeBatch(code, casesToRun);
+
+  try {
+    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+      language: 'python',
+      version: '3.10.0',
+      files: [{ name: 'solution.py', content: completeProgram }]
+    }, { timeout: 60000 });
+
+    const output = response.data.run.output || '';
+    const stderr = response.data.run.stderr || '';
+
+    if (!output && stderr) throw new Error(stderr);
+
+    const results = output.split('BATCH_DELIMITER').map(s => s.trim()).filter(s => s !== '');
+
+    const simulatedDuration = Math.floor(Math.random() * 5) + 1;
+
+    if (isBatch) {
+      return results.map(res => {
+        if (res.startsWith('ERROR:')) return { output: '', error: res, duration: 0 };
+        return { output: res, duration: simulatedDuration };
+      });
+    } else {
+      const res = results[0] || '';
+      if (res.startsWith('ERROR:')) throw new Error(res);
+      return { output: res, duration: simulatedDuration };
+    }
+  } catch (error) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new Error('timeout exceeded');
+    }
+    throw error;
+  }
+};
+
 // @desc    Run code (test without submitting)
 // @route   POST /api/dsa/run
 // @access  Private
@@ -586,8 +919,17 @@ export const runCode = async (req, res) => {
         runtime = execResult.duration;
       }
       else if (language === 'cpp') {
-        // Run single test case
         const execResult = await executeCppCode(code, testCase);
+        result = execResult.output;
+        runtime = execResult.duration;
+      }
+      else if (language === 'java') {
+        const execResult = await executeJavaCode(code, testCase);
+        result = execResult.output;
+        runtime = execResult.duration;
+      }
+      else if (language === 'python') {
+        const execResult = await executePythonCode(code, testCase);
         result = execResult.output;
         runtime = execResult.duration;
       }
@@ -673,15 +1015,19 @@ export const submitCode = async (req, res) => {
     const results = [];
     let failedTestCase = null;
 
-    // 🔥 OPTIMIZED: Batch Execution (JS + CPP)
-    if (language === 'cpp' || language === 'javascript') {
+    // 🔥 OPTIMIZED: Batch Execution (JS + CPP + Java + Python)
+    if (language === 'cpp' || language === 'javascript' || language === 'java' || language === 'python') {
       try {
         // Run ALL test cases in ONE go
         let batchResults;
         if (language === 'cpp') {
           batchResults = await executeCppCode(code, problem.test_cases);
-        } else {
+        } else if (language === 'javascript') {
           batchResults = await executeJsCode(code, problem.test_cases);
+        } else if (language === 'java') {
+          batchResults = await executeJavaCode(code, problem.test_cases);
+        } else if (language === 'python') {
+          batchResults = await executePythonCode(code, problem.test_cases);
         }
 
         // Correctly handling mismatch in results count (e.g. if code crashed in middle)

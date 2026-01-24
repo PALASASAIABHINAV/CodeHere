@@ -25,6 +25,18 @@ public:
         
     }
 };`;
+  } else if (language === 'java') {
+    return problem.template_java || `class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        // Write your code here
+        
+    }
+}`;
+  } else if (language === 'python') {
+    return problem.template_python || `class Solution:
+    def twoSum(self, nums, target):
+        # Write your code here
+        pass`;
   }
   return '// Write your code here';
 };
@@ -677,6 +689,12 @@ const ProblemSolve = () => {
               <option value="cpp">
                 C++ (GCC 11.2)
               </option>
+              <option value="java">
+                Java (OpenJDK 15)
+              </option>
+              <option value="python">
+                Python (3.10)
+              </option>
             </select>
 
             {/* Reset Code Button */}
@@ -743,7 +761,7 @@ const ProblemSolve = () => {
 
           <Editor
             height="100%"
-            language={language === "javascript" ? "javascript" : "cpp"}
+            language={language === "javascript" ? "javascript" : language === "cpp" ? "cpp" : language === "java" ? "java" : "python"}
             theme="vs-dark"
             value={code}
             onChange={handleCodeChange}
