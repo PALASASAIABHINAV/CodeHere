@@ -875,12 +875,12 @@ const executePythonCode = async (code, testCases) => {
   }
 };
 
-// @desc    Run code (test without submitting)
+// @desc    Run code (test first 3 cases without submitting)
 // @route   POST /api/dsa/run
 // @access  Private
 export const runCode = async (req, res) => {
   try {
-    const { code, language, problemId, testCaseIndex } = req.body;
+    const { code, language, problemId } = req.body;
 
     if (!code || !language || !problemId) {
       return res.status(400).json({
@@ -897,88 +897,105 @@ export const runCode = async (req, res) => {
       });
     }
 
-    const testCase = testCaseIndex !== undefined
-      ? problem.test_cases[testCaseIndex]
-      : problem.test_cases[0];
+    // 🔥 Run first 3 test cases (or less if fewer exist)
+    const testCasesToRun = problem.test_cases.slice(0, 3);
 
-    if (!testCase) {
+    if (testCasesToRun.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Test case not found',
+        message: 'No test cases available',
       });
     }
 
-    try {
-      let result;
-      let runtime = 0;
+    let batchResults;
 
+    try {
       if (language === 'javascript') {
-        // Run single test case via Piston
-        const execResult = await executeJsCode(code, testCase);
-        result = execResult.output;
-        runtime = execResult.duration;
-      }
-      else if (language === 'cpp') {
-        const execResult = await executeCppCode(code, testCase);
-        result = execResult.output;
-        runtime = execResult.duration;
-      }
-      else if (language === 'java') {
-        const execResult = await executeJavaCode(code, testCase);
-        result = execResult.output;
-        runtime = execResult.duration;
-      }
-      else if (language === 'python') {
-        const execResult = await executePythonCode(code, testCase);
-        result = execResult.output;
-        runtime = execResult.duration;
-      }
-      else {
+        batchResults = await executeJsCode(code, testCasesToRun);
+      } else if (language === 'cpp') {
+        batchResults = await executeCppCode(code, testCasesToRun);
+      } else if (language === 'java') {
+        batchResults = await executeJavaCode(code, testCasesToRun);
+      } else if (language === 'python') {
+        batchResults = await executePythonCode(code, testCasesToRun);
+      } else {
         return res.status(400).json({
           success: false,
           message: 'Unsupported language',
         });
       }
 
-      // Compare output
-      const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
-      const actualOutput = result.trim();
+      // Process results
+      const results = [];
+      let allPassed = true;
 
-      // Normalize for comparison
-      let normalizedActual = actualOutput;
-      try {
-        normalizedActual = JSON.stringify(JSON.parse(actualOutput));
-      } catch (e) {
-        // If not JSON, compare as string
+      // Handle crashing or incomplete execution
+      if (batchResults.length !== testCasesToRun.length) {
+        const lastRes = batchResults[batchResults.length - 1];
+        if (lastRes && lastRes.error) throw new Error(lastRes.error);
+        throw new Error("Runtime Error: Execution incomplete");
       }
 
-      const passed = normalizedActual === expectedOutput;
+      for (let i = 0; i < testCasesToRun.length; i++) {
+        const testCase = testCasesToRun[i];
+        const resultData = batchResults[i];
 
-      res.status(200).json({
-        success: true,
-        passed,
-        testCase: {
+        if (resultData.error) {
+          results.push({
+            testCase: i + 1,
+            passed: false,
+            error: resultData.error,
+            status: 'Runtime Error'
+          });
+          allPassed = false;
+          continue;
+        }
+
+        const result = resultData.output;
+        const runtime = resultData.duration;
+
+        const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
+
+        let normalizedActual = result.trim();
+        try {
+          // Try to normalize JSON if applicable
+          normalizedActual = JSON.stringify(JSON.parse(result.trim()));
+        } catch (e) { }
+
+        const passed = normalizedActual === expectedOutput;
+        if (!passed) allPassed = false;
+
+        results.push({
+          testCase: i + 1,
+          passed,
           input: testCase.input,
           expectedOutput: testCase.output,
           actualOutput: result,
-          explanation: testCase.explanation || null
-        },
-        runtime, // Now returns pure CPU time (or simulated)
-        status: passed ? 'Accepted' : 'Wrong Answer',
-      });
-    } catch (error) {
-      const isTimeout = error.message.includes('timeout') || error.killed;
-      const isCompileError = error.message.includes('error:');
+          runtime,
+          status: passed ? 'Accepted' : 'Wrong Answer'
+        });
+      }
 
       res.status(200).json({
         success: true,
-        passed: false,
+        allPassed,
+        results,
+        status: allPassed ? 'Accepted' : 'Wrong Answer'
+      });
+
+    } catch (error) {
+      const isTimeout = error.message.includes('timeout') || error.killed;
+      const isCompileError = error.message.includes('error:') || error.message.includes('SyntaxError');
+
+      res.status(200).json({
+        success: true,
+        allPassed: false,
         error: error.message,
-        status: isTimeout ? 'Time Limit Exceeded' :
-          isCompileError ? 'Compilation Error' :
-            'Runtime Error',
+        status: isTimeout ? 'Time Limit Exceeded' : isCompileError ? 'Compilation Error' : 'Runtime Error',
+        results: []
       });
     }
+
   } catch (error) {
     console.error('Run code error:', error);
     res.status(500).json({
