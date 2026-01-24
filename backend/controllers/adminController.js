@@ -9,7 +9,7 @@ import User from '../models/User.js';
 export const getAllUsers = async (req, res) => {
   try {
     const users = await User.getAll();
-    
+
     res.status(200).json({
       success: true,
       count: users.length,
@@ -31,19 +31,19 @@ export const updateUserRole = async (req, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
-    
+
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role',
       });
     }
-    
+
     await pool.query(
       'UPDATE users SET role = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [role, userId]
     );
-    
+
     res.status(200).json({
       success: true,
       message: 'User role updated successfully',
@@ -64,12 +64,12 @@ export const togglePrime = async (req, res) => {
   try {
     const { userId } = req.params;
     const { isPrime } = req.body;
-    
+
     await pool.query(
       'UPDATE users SET is_prime = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [isPrime, userId]
     );
-    
+
     res.status(200).json({
       success: true,
       message: `Prime membership ${isPrime ? 'granted' : 'revoked'} successfully`,
@@ -89,9 +89,9 @@ export const togglePrime = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     await User.delete(userId);
-    
+
     res.status(200).json({
       success: true,
       message: 'User deleted successfully',
@@ -122,22 +122,25 @@ export const createProblem = async (req, res) => {
       is_premium,
       template_js,
       template_cpp,
+      template_java,
+      template_python,
       hints,
       constraints,
       acceptance,
       locked_testcases
     } = req.body;
-    
+
     const query = `
       INSERT INTO dsa_problems (
         title, slug, difficulty, description, examples, test_cases,
         tags, companies, is_premium, template_js, template_cpp,
-        hints, constraints, acceptance, locked_testcases
+        template_java, template_python, hints, constraints, 
+        acceptance, locked_testcases
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `;
-    
+
     const result = await pool.query(query, [
       title,
       slug || title.toLowerCase().replace(/\s+/g, '-'),
@@ -150,12 +153,14 @@ export const createProblem = async (req, res) => {
       is_premium || false,
       template_js,
       template_cpp,
+      template_java,
+      template_python,
       hints,
       constraints,
       acceptance || '0',
       locked_testcases || 3
     ]);
-    
+
     res.status(201).json({
       success: true,
       message: 'Problem created successfully',
@@ -178,12 +183,12 @@ export const updateProblem = async (req, res) => {
   try {
     const { problemId } = req.params;
     const updates = req.body;
-    
+
     // Build dynamic update query
     const fields = [];
     const values = [];
     let paramCount = 1;
-    
+
     Object.keys(updates).forEach(key => {
       if (updates[key] !== undefined) {
         // Handle JSON fields
@@ -204,33 +209,33 @@ export const updateProblem = async (req, res) => {
         paramCount++;
       }
     });
-    
+
     if (fields.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'No fields to update',
       });
     }
-    
+
     fields.push('updated_at = CURRENT_TIMESTAMP');
     values.push(problemId);
-    
+
     const query = `
       UPDATE dsa_problems 
       SET ${fields.join(', ')}
       WHERE id = $${paramCount}
       RETURNING *
     `;
-    
+
     const result = await pool.query(query, values);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Problem not found',
       });
     }
-    
+
     res.status(200).json({
       success: true,
       message: 'Problem updated successfully',
@@ -251,9 +256,9 @@ export const updateProblem = async (req, res) => {
 export const deleteProblem = async (req, res) => {
   try {
     const { problemId } = req.params;
-    
+
     await pool.query('DELETE FROM dsa_problems WHERE id = $1', [problemId]);
-    
+
     res.status(200).json({
       success: true,
       message: 'Problem deleted successfully',
@@ -280,7 +285,7 @@ export const getStats = async (req, res) => {
         (SELECT COUNT(*) FROM user_submissions) as total_submissions,
         (SELECT COUNT(*) FROM user_submissions WHERE status = 'Accepted') as accepted_submissions
     `);
-    
+
     res.status(200).json({
       success: true,
       stats: stats.rows[0],
