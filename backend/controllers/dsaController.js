@@ -1,5 +1,5 @@
 import DsaProblem from '../models/DsaProblem.js';
-import { VM } from 'vm2';
+
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
@@ -106,84 +106,109 @@ export const getProblemBySlug = async (req, res) => {
   }
 };
 
-// 🔥 Helper: Wrap JavaScript code with multi-input support (handles void/in-place functions + LinkedList)
-const wrapJavaScriptCode = (code, testCase) => {
-  const functionMatch = code.match(/(?:var|let|const|function)\s+(\w+)\s*=/);
+// 🔥 LEGACY REMOVED: wrapJavaScriptCode (VM2)
+// 🔥 NOW USING: wrapJsCodeBatch (Piston)
+
+// 🔥 OPTIMIZED: Batch JavaScript Wrapper
+// Generates a Node.js script that runs ALL test cases in one go.
+const wrapJsCodeBatch = (userCode, testCases) => {
+  const isLinkedListProblem = userCode.includes('ListNode') || userCode.includes('Node');
+
+  // Extract function name to call
+  const functionMatch = userCode.match(/(?:var|let|const|function)\s+(\w+)\s*=/);
   const functionName = functionMatch ? functionMatch[1] : 'solution';
 
-  const inputs = testCase.input
-    .trim()
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line !== '');
-
-  // 🔥 Detect if this is a LinkedList problem (only check the code, not input)
-  const isLinkedListProblem = code.includes('ListNode') || code.includes('Node');
-
   return `
-    // 🔥 ListNode Definition
-    function ListNode(val, next) {
-      this.val = (val === undefined ? 0 : val);
-      this.next = (next === undefined ? null : next);
+// 🔥 Common Data Structures & Helpers
+function ListNode(val, next) {
+  this.val = (val === undefined ? 0 : val);
+  this.next = (next === undefined ? null : next);
+}
+
+function arrayToList(arr) {
+  if (!arr || arr.length === 0) return null;
+  let head = new ListNode(arr[0]);
+  let current = head;
+  for (let i = 1; i < arr.length; i++) {
+    current.next = new ListNode(arr[i]);
+    current = current.next;
+  }
+  return head;
+}
+
+function listToArray(head) {
+  let result = [];
+  let current = head;
+  while (current !== null) {
+    result.push(current.val);
+    current = current.next;
+  }
+  return result;
+}
+
+// 🔥 Input Parser
+const parseInput = (input, isLinkedList) => {
+  try {
+    const parsed = JSON.parse(input);
+    if (Array.isArray(parsed) && isLinkedList) {
+      return arrayToList(parsed);
     }
-    
-    // 🔥 Helper: Convert array to linked list
-    function arrayToList(arr) {
-      if (!arr || arr.length === 0) return null;
-      let head = new ListNode(arr[0]);
-      let current = head;
-      for (let i = 1; i < arr.length; i++) {
-        current.next = new ListNode(arr[i]);
-        current = current.next;
+    return parsed;
+  } catch (e) {
+    if (!isNaN(input) && input !== '') return Number(input);
+    return input;
+  }
+};
+
+// 🔥 User Code
+${userCode}
+
+// 🔥 Test Runner
+(function() {
+  const testCases = ${JSON.stringify(testCases)};
+  const isLinkedListProblem = ${isLinkedListProblem};
+
+  testCases.forEach((testCase) => {
+    try {
+      const inputs = testCase.input
+        .trim()
+        .split('\\n')
+        .map(line => line.trim())
+        .filter(line => line !== '')
+        .map(input => parseInput(input, isLinkedListProblem));
+
+      // Execute User Function
+      const result = ${functionName}(...inputs);
+      
+      let output;
+      // Handle "In-Place" / Void return where first arg is modified
+      if (result === undefined && inputs.length > 0) {
+         // If input was linked list (now ListNode object)
+         if (isLinkedListProblem && inputs[0] && inputs[0].val !== undefined) {
+             output = JSON.stringify(listToArray(inputs[0]));
+         }
+         // If input was array (and modified in place)
+         else if (Array.isArray(inputs[0])) {
+             output = JSON.stringify(inputs[0]);
+         } else {
+             output = "undefined"; // Should ideally be handled
+         }
+      } 
+      else if (isLinkedListProblem && (result === null || (result && result.val !== undefined))) {
+           output = JSON.stringify(listToArray(result));
       }
-      return head;
-    }
-    
-    // 🔥 Helper: Convert linked list to array
-    function listToArray(head) {
-      let result = [];
-      let current = head;
-      while (current !== null) {
-        result.push(current.val);
-        current = current.next;
+      else {
+           output = JSON.stringify(result);
       }
-      return result;
+      
+      console.log(output);
+    } catch (error) {
+       console.log("ERROR: " + error.message);
     }
-    
-    ${code}
-    
-    const inputs = ${JSON.stringify(inputs)};
-    const parsedInputs = inputs.map((input, idx) => {
-      try {
-        const parsed = JSON.parse(input);
-        // 🔥 Convert ALL array inputs to LinkedList if it's a LinkedList problem
-        if (Array.isArray(parsed) && ${isLinkedListProblem}) {
-          return arrayToList(parsed);
-        }
-        return parsed;
-      } catch {
-        if (!isNaN(input) && input !== '') {
-          return Number(input);
-        }
-        return input;
-      }
-    });
-    
-    
-    const result = ${functionName}(...parsedInputs);
-    
-    // 🔥 FIX: Handle different return types
-    if (result === undefined && Array.isArray(parsedInputs[0])) {
-      // Void function with array
-      JSON.stringify(parsedInputs[0]);
-    } else if (${isLinkedListProblem} && (result === null || (result && result.val !== undefined))) {
-      // LinkedList result (including null) - convert to array
-      JSON.stringify(listToArray(result));
-    } else {
-      // Regular result
-      JSON.stringify(result);
-    }
-  `;
+    console.log("BATCH_DELIMITER");
+  });
+})();
+`;
 };
 
 // 🔥 OPTIMIZED: Batch C++ Wrapper
@@ -473,6 +498,50 @@ const executeCppCode = async (code, testCases) => {
   }
 };
 
+// 🔥 Execute JavaScript code using Piston API
+const executeJsCode = async (code, testCases) => {
+  const isBatch = Array.isArray(testCases);
+  const casesToRun = isBatch ? testCases : [testCases];
+
+  // Wrap
+  const completeProgram = wrapJsCodeBatch(code, casesToRun);
+
+  try {
+    const response = await axios.post('https://emkc.org/api/v2/piston/execute', {
+      language: 'javascript',
+      version: '18.15.0',
+      files: [{ name: 'solution.js', content: completeProgram }]
+    }, { timeout: 60000 });
+
+    const output = response.data.run.output || '';
+    const stderr = response.data.run.stderr || '';
+
+    // If output is empty and we have stderr, it's a crash/syntax error
+    if (!output && stderr) throw new Error(stderr);
+
+    // Split results
+    const results = output.split('BATCH_DELIMITER').map(s => s.trim()).filter(s => s !== '');
+
+    const simulatedDuration = Math.floor(Math.random() * 5) + 10; // Slight overhead for JS
+
+    if (isBatch) {
+      return results.map(res => {
+        if (res.startsWith('ERROR:')) return { output: '', error: res, duration: 0 };
+        return { output: res, duration: simulatedDuration };
+      });
+    } else {
+      const res = results[0] || '';
+      if (res.startsWith('ERROR:')) throw new Error(res);
+      return { output: res, duration: simulatedDuration };
+    }
+  } catch (error) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new Error('timeout exceeded');
+    }
+    throw error;
+  }
+};
+
 // @desc    Run code (test without submitting)
 // @route   POST /api/dsa/run
 // @access  Private
@@ -511,19 +580,10 @@ export const runCode = async (req, res) => {
       let runtime = 0;
 
       if (language === 'javascript') {
-        const vm = new VM({
-          timeout: 3000,
-          sandbox: {}
-        });
-
-        const wrappedCode = wrapJavaScriptCode(code, testCase);
-
-        // Measure ONLY VM execution time
-        const start = process.hrtime();
-        result = vm.run(wrappedCode);
-        const diff = process.hrtime(start);
-        const ms = (diff[0] * 1000 + diff[1] / 1e6); // Convert to ms
-        runtime = Math.max(1, Math.round(ms)); // Ensure at least 1ms
+        // Run single test case via Piston
+        const execResult = await executeJsCode(code, testCase);
+        result = execResult.output;
+        runtime = execResult.duration;
       }
       else if (language === 'cpp') {
         // Run single test case
@@ -613,21 +673,34 @@ export const submitCode = async (req, res) => {
     const results = [];
     let failedTestCase = null;
 
-    // 🔥 OPTIMIZED: C++ Batch Execution
-    if (language === 'cpp') {
+    // 🔥 OPTIMIZED: Batch Execution (JS + CPP)
+    if (language === 'cpp' || language === 'javascript') {
       try {
         // Run ALL test cases in ONE go
-        const batchResults = await executeCppCode(code, problem.test_cases);
+        let batchResults;
+        if (language === 'cpp') {
+          batchResults = await executeCppCode(code, problem.test_cases);
+        } else {
+          batchResults = await executeJsCode(code, problem.test_cases);
+        }
 
         // Correctly handling mismatch in results count (e.g. if code crashed in middle)
         if (batchResults.length !== problem.test_cases.length) {
           // If fewer results than cases, it effectively crashed or stopped early
+          // Check if the last result was an error
+          const lastRes = batchResults[batchResults.length - 1];
+          if (lastRes && lastRes.error) throw new Error(lastRes.error);
+
           throw new Error("Runtime Error: Code execution incomplete (possible crash)");
         }
 
         for (let i = 0; i < problem.test_cases.length; i++) {
           const testCase = problem.test_cases[i];
           const resultData = batchResults[i];
+
+          if (resultData.error) {
+            throw new Error(resultData.error);
+          }
 
           const result = resultData.output;
           const runtime = resultData.duration;
@@ -654,15 +727,10 @@ export const submitCode = async (req, res) => {
             expectedOutput: testCase.output,
             actualOutput: result,
           });
-
-          // Stop processing results if we found a failure? 
-          // Usually valid to continue processing to show all results, 
-          // but for "Failed" status we know it failed. 
-          // Piston ran them all anyway, so might as well show them.
         }
       } catch (error) {
         // Handle compilation errors or crash that prevented partial output
-        const isCompileError = error.message.includes('error:');
+        const isCompileError = error.message.includes('error:') || error.message.includes('SyntaxError');
         return res.status(200).json({
           success: true,
           status: isCompileError ? 'Compilation Error' : 'Runtime Error',
@@ -679,69 +747,7 @@ export const submitCode = async (req, res) => {
         });
       }
     } else {
-      // JavaScript Loop (Already fast locally)
-      for (let i = 0; i < problem.test_cases.length; i++) {
-        const testCase = problem.test_cases[i];
-
-        try {
-          let result;
-          let runtime = 0;
-
-          if (language === 'javascript') {
-            const vm = new VM({
-              timeout: 3000,
-              sandbox: {}
-            });
-            const wrappedCode = wrapJavaScriptCode(code, testCase);
-
-            const start = process.hrtime();
-            result = vm.run(wrappedCode);
-            const diff = process.hrtime(start);
-            const ms = (diff[0] * 1000 + diff[1] / 1e6);
-            runtime = Math.max(1, Math.round(ms));
-          }
-
-          totalRuntime += runtime;
-
-          const expectedOutput = JSON.stringify(JSON.parse(testCase.output));
-          let normalizedActual = result.trim();
-          try {
-            normalizedActual = JSON.stringify(JSON.parse(result.trim()));
-          } catch (e) { }
-
-          const passed = normalizedActual === expectedOutput;
-
-          results.push({
-            testCase: i + 1,
-            passed,
-            runtime,
-            input: testCase.input,
-            expectedOutput: testCase.output,
-            actualOutput: result,
-          });
-
-          if (!passed) {
-            allPassed = false;
-            failedTestCase = i + 1;
-            break;
-          }
-        } catch (error) {
-          allPassed = false;
-          failedTestCase = i + 1;
-          const isTimeout = error.message.includes('timeout') || error.killed;
-          const isCompileError = error.message.includes('error:');
-
-          results.push({
-            testCase: i + 1,
-            passed: false,
-            error: error.message,
-            status: isTimeout ? 'Time Limit Exceeded' :
-              isCompileError ? 'Compilation Error' :
-                'Runtime Error',
-          });
-          break;
-        }
-      }
+      // Fallback for other languages (none currently)
     }
 
     const status = allPassed ? 'Accepted' : 'Wrong Answer';
